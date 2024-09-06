@@ -1,0 +1,27 @@
+
+services:
+   ros2docker_services:
+      tty: true
+      image: ros2docker_roscon
+      container_name: ros2roscon
+      network_mode: host
+      privileged: true
+      volumes: 
+        - /tmp/.X11-unix:/tmp/.X11-unix:rw
+        - ~/.xauth_docker/share/:/tmp/xauth/
+        - /dev/input:/dev/input
+        - /dev/bus/usb:/dev/bus/usb
+        - ../:/home/user/ros2_ws:rw 
+        - ./scripts:/scripts
+      environment:
+        - DISPLAY=$DISPLAY
+        - QT_X11_NO_MITSHM=1
+        - XAUTHORITY=/tmp/xauth/.docker.xauth     
+      working_dir: /home/user/ros2_ws
+      devices:
+        - /dev/dri:/dev/dri
+        - /dev/snd:/dev/snd
+        - /dev/bus/usb:/dev/bus/usb:rw
+      user: "user:user"
+      command: ["/bin/bash", "-c", "chmod +x /scripts/setup_bashrc.sh && /scripts/setup_bashrc.sh && bash"]
+
