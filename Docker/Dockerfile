@@ -5,8 +5,8 @@ FROM ubuntu:jammy
 # To check their value use these commands
 # $ id -u  (for the UID)
 # $ id -g  (for the GUI)
-ARG UID=1001
-ARG GID=1001
+ARG UID=1000
+ARG GID=1000
 
 RUN locale
 RUN apt-get update && apt-get install locales -y
@@ -31,10 +31,10 @@ RUN apt-get update
 RUN apt-get upgrade -y
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get install \
-ros-humble-desktop ros-dev-tools ros-humble-gazebo* \ 
-python3-colcon-common-extensions -y \
-mlocate \
-python3-colcon-clean -y 
+ros-humble-desktop ros-dev-tools  \
+python3-colcon-common-extensions \
+mlocate  \
+python3-colcon-clean -y
 
 RUN wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg 
 RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null 
@@ -49,7 +49,10 @@ ros-humble-ros2-control -y  \
 ros-humble-ros2-controllers -y \
 ros-humble-ign-ros2-control -y \
 ros-humble-ign-ros2-control-demos -y \
-ros-humble-joint-state-publisher-gui 
+ros-humble-joint-state-publisher-gui -y
+
+
+RUN DEBIAN_FRONTEND=noninteractive apt-get install ros-humble-realsense2-description -y
 
 USER user
 CMD ["/bin/bash"]

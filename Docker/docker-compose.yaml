@@ -2,8 +2,8 @@
 services:
    ros2docker_services:
       tty: true
-      image: ros2docker_roscon
-      container_name: ros2roscon
+      image: ros2roscon
+      container_name: ros2roscon_container
       network_mode: host
       privileged: true
       volumes: 

@@ -1,0 +1,174 @@
+<?xml version="1.0"?>
+
+<robot name="cube" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    
+    <xacro:arg name="use_camera" default="false" />
+    <xacro:arg name="use_depth"  default="false" />
+    <xacro:arg name="use_lidar"  default="false" />
+
+    <xacro:property name="use_camera" value="$(arg use_camera)" />    
+    <xacro:property name="use_depth" value="$(arg use_depth)" />
+    <xacro:property name="use_lidar" value="$(arg use_lidar)" />
+
+
+    <link name="base_link">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <box size="0.2 0.2 0.2"/>
+            </geometry>
+        </visual>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <box size="0.2 0.2 0.2"/>
+            </geometry>
+        </collision>
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <mass value="100"/>
+            <inertia
+            ixx="1.0" ixy="0.0" ixz="0.0"
+            iyy="1.0" iyz="0.0"
+            izz="1.0"/>
+        </inertial>
+    </link>
+    
+    <link name="sensor_link">
+            <inertial>
+            <mass value="0.1"/>
+            <origin xyz="0 0 0"/>
+            <inertia ixx="0.01" ixy="0.0" ixz="0.0" iyy="0.01" iyz="0.0" izz="0.01"/>
+        </inertial>
+        <visual>
+            <geometry>
+                <cylinder length="0.1" radius="0.02"/>
+            </geometry>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <material name="black"/>
+        </visual>
+        <collision>
+            <geometry>
+                <cylinder length="0.1" radius="0.02"/>
+            </geometry>
+        </collision>
+    </link>
+
+    <joint name="base_to_sensor" type="fixed">
+        <parent link="base_link"/>
+        <child link="sensor_link"/>
+        <origin xyz="0 0 0.2" rpy="0.0 0.0 3.1415"/>
+    </joint>
+
+    <xacro:if value="${use_camera}">                        
+        <gazebo reference="sensor_link">
+            <sensor name="cube_camera" type="camera">
+                <always_on>1</always_on>
+                <update_rate>30</update_rate>
+                <visualize>1</visualize>
+                <pose>0 0.0175 0.5125 0 -0 0</pose>
+                <topic>/cube_camera/image_raw</topic>
+                <camera name="camera">
+                    <horizontal_fov>1.21126</horizontal_fov>
+                    <image>
+                        <width>640</width>
+                        <height>480</height>
+                        <format>RGB_INT8</format>
+                    </image>
+                    <clip>
+                        <near>0.1</near>
+                        <far>100</far>
+                    </clip>
+                    <noise>
+                        <type>gaussian</type>
+                        <mean>0</mean>
+                        <stddev>0.007</stddev>
+                    </noise>
+                </camera>
+            </sensor>   
+        </gazebo>
+    </xacro:if>
+
+    <xacro:if value="${use_depth}">         
+        <gazebo reference="base_link">
+            <xacro:include filename="$(find realsense2_description)/urdf/_d435.urdf.xacro"/>
+            <xacro:arg name="use_nominal_extrinsics" default="true"/>
+            <xacro:arg name="add_plug" default="false" />
+            <xacro:arg name="use_mesh" default="true" />                       
+            <xacro:sensor_d435 parent="base_link" use_nominal_extrinsics="$(arg use_nominal_extrinsics)" add_plug="$(arg add_plug)" use_mesh="$(arg use_mesh)">
+                <origin xyz="0 0 0.5" rpy="0 0 0"/>
+            </xacro:sensor_d435>
+
+            <sensor name='d435_depth' type='depth_camera'>
+                <ignition_frame_id>camera_link</ignition_frame_id>
+                <always_on>1</always_on>
+                <update_rate>90</update_rate>
+                <visualize>1</visualize>
+                <topic>/cube_depth/image_raw</topic>
+                <pose>0 0.0175 0.5125 0 -0 0</pose>
+                <camera name='d435'>
+                    <ignition_frame_id>camera_link</ignition_frame_id>
+                    <horizontal_fov>1.48702</horizontal_fov>
+                    <image>
+                        <width>1280</width>
+                        <height>720</height>
+                    </image>
+                    <clip>
+                        <near>0.1</near>
+                        <far>100</far>
+                    </clip>
+                    <noise>
+                        <type>gaussian</type>
+                        <mean>0</mean>
+                        <stddev>0.1</stddev>
+                    </noise>
+                </camera>
+            </sensor> 
+        </gazebo> 
+    </xacro:if>
+
+    <xacro:if value="${use_lidar}">         
+        <gazebo reference="sensor_link">
+            <sensor name="gpu_lidar" type="gpu_lidar">
+                <pose>-0.064 0 0.121 0 0 0</pose>
+                <topic>/cube/scan</topic>
+                    <ignition_frame_id>base_scan</ignition_frame_id>
+                    <update_rate>5</update_rate>
+                    <ray>
+                        <scan>
+                            <horizontal>
+                                <samples>360</samples>
+                                <resolution>1</resolution>
+                                <min_angle>0</min_angle>
+                                <max_angle>6.28</max_angle>
+                            </horizontal>
+                        </scan>
+                        <range>
+                            <min>0.120000</min>
+                            <max>20.0</max>
+                            <resolution>0.015000</resolution>
+                        </range>
+                        <noise>
+                            <type>gaussian</type>
+                            <mean>0.0</mean>
+                            <stddev>0.01</stddev>
+                        </noise>
+                    </ray>
+                    <always_on>true</always_on>
+                    <visualize>1</visualize>
+                </sensor>
+        </gazebo>
+    </xacro:if>
+
+ 
+
+    <xacro:if value="${use_camera or use_depth or use_lidar}"  >
+        <gazebo>
+            <plugin filename="libignition-gazebo-sensors-system.so" name="ignition::gazebo::systems::Sensors"> 
+                <ignition_frame_id>camera_link</ignition_frame_id>
+                <render_engine>ogre</render_engine>
+            </plugin>   
+        </gazebo>
+    </xacro:if>
+</robot>
