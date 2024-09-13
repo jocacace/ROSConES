@@ -92,11 +92,8 @@
 
     <xacro:if value="${use_depth}">         
         <gazebo reference="base_link">
-            <xacro:include filename="$(find realsense2_description)/urdf/_d435.urdf.xacro"/>
-            <xacro:arg name="use_nominal_extrinsics" default="true"/>
-            <xacro:arg name="add_plug" default="false" />
-            <xacro:arg name="use_mesh" default="true" />                       
-            <xacro:sensor_d435 parent="base_link" use_nominal_extrinsics="$(arg use_nominal_extrinsics)" add_plug="$(arg add_plug)" use_mesh="$(arg use_mesh)">
+            <xacro:include filename="$(find realsense2_description)/urdf/_d435.urdf.xacro"/>            
+            <xacro:sensor_d435 parent="base_link" use_nominal_extrinsics="true" add_plug="false" use_mesh="true">
                 <origin xyz="0 0 0.5" rpy="0 0 0"/>
             </xacro:sensor_d435>
 
@@ -106,7 +103,7 @@
                 <update_rate>90</update_rate>
                 <visualize>1</visualize>
                 <topic>/cube_depth/image_raw</topic>
-                <pose>0 0.0175 0.5125 0 -0 0</pose>
+                <pose>0 0.0175 0.0 0 -0 0</pose>
                 <camera name='d435'>
                     <ignition_frame_id>camera_link</ignition_frame_id>
                     <horizontal_fov>1.48702</horizontal_fov>
@@ -130,34 +127,41 @@
 
     <xacro:if value="${use_lidar}">         
         <gazebo reference="sensor_link">
-            <sensor name="gpu_lidar" type="gpu_lidar">
-                <pose>-0.064 0 0.121 0 0 0</pose>
-                <topic>/cube/scan</topic>
-                    <ignition_frame_id>base_scan</ignition_frame_id>
-                    <update_rate>5</update_rate>
-                    <ray>
-                        <scan>
-                            <horizontal>
-                                <samples>360</samples>
-                                <resolution>1</resolution>
-                                <min_angle>0</min_angle>
-                                <max_angle>6.28</max_angle>
-                            </horizontal>
-                        </scan>
-                        <range>
-                            <min>0.120000</min>
-                            <max>20.0</max>
-                            <resolution>0.015000</resolution>
-                        </range>
-                        <noise>
-                            <type>gaussian</type>
-                            <mean>0.0</mean>
-                            <stddev>0.01</stddev>
-                        </noise>
-                    </ray>
-                    <always_on>true</always_on>
-                    <visualize>1</visualize>
-                </sensor>
+            
+            <sensor name="lidar" type='gpu_lidar'>
+            <pose>0 0 0.2 0 0 0</pose>
+            <topic>lidar</topic>
+            <update_rate>10</update_rate>
+            <ray>
+                <scan>
+                    <horizontal>
+                        <samples>640</samples>
+                        <resolution>1</resolution>
+                        <min_angle>-1.396263</min_angle>
+                        <max_angle>1.396263</max_angle>
+                    </horizontal>
+                    <vertical>
+                        <samples>16</samples>
+                        <resolution>1</resolution>
+                        <min_angle>-0.261799</min_angle>
+                        <max_angle>0.261799</max_angle>
+                    </vertical>
+                </scan>
+                <range>
+                    <!-- <min>0.08</min> -->
+                    <min>0.1</min>
+                    <max>10.0</max>
+                    <resolution>0.01</resolution>
+                </range>
+            </ray>
+            <always_on>1</always_on>
+            <visualize>true</visualize>
+			<gz_frame_id>lidar_link</gz_frame_id>
+            </sensor>
+                
+
+
+
         </gazebo>
     </xacro:if>
 

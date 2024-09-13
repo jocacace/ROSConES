@@ -17,17 +17,6 @@ def generate_launch_description():
     ld = LaunchDescription()
     xacro_path = 'urdf/cube_with_sensors.urdf.xacro'
 
-    robot_model_path = PathJoinSubstitution([
-        get_package_share_directory('gazebo_sensors'),	
-        xacro_path
-    ])
-
-    xacro_input_args = {
-        'use_camera': True,
-        'use_depth': True,
-        'use_lidar': False
-    }
-
     
     robot_description = xacro.process_file( Path(os.path.join( get_package_share_directory('gazebo_sensors'), xacro_path ) ), mappings={'use_camera': "True", 'use_depth': "True", 'use_lidar': "True"})
 
@@ -41,7 +30,6 @@ def generate_launch_description():
         }]
     )
 
-    # Spawn
     spawn_node = Node(package='ros_gz_sim', executable='create',
                  arguments=[
                     '-name', 'cube_with_sensors',    

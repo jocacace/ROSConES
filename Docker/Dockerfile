@@ -5,8 +5,8 @@ FROM ubuntu:jammy
 # To check their value use these commands
 # $ id -u  (for the UID)
 # $ id -g  (for the GUI)
-ARG UID=1000
-ARG GID=1000
+ARG UID=1001
+ARG GID=1001
 
 RUN locale
 RUN apt-get update && apt-get install locales -y
@@ -50,6 +50,8 @@ ros-humble-ros2-controllers -y \
 ros-humble-ign-ros2-control -y \
 ros-humble-ign-ros2-control-demos -y \
 ros-humble-joint-state-publisher-gui -y
+
+RUN DEBIAN_FRONTEND=noninteractive apt-get install ros-humble-rqt-* -y
 
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get install ros-humble-realsense2-description -y
