@@ -933,8 +933,467 @@ install(DIRECTORY launch urdf DESTINATION share/${PROJECT_NAME})
 
         $ rqt 
         
-
 ## Example 6: Gazebo plugin
+In this example we will learn how to develop new plugins for Gazebo. Developing a plugin that will be added to the Gazebo world configuration, or directly to the robot model (as made with the the differential drive control plugin), allow you to directly access to the simulated model, creating fastest control algorithms. We will discuss 3 examples. One standalone plugin, to understand the structure of a plugin. One integrating ROS2 and Gazebo and finally, one more complex plugin to control the differential drive robot. 
+
+#### Basic plugin
+This is not a ROS2 package, so we can create manually the directory structure. 
+
+1) Let's create the hello_world plugin in the ROS2 worksapce. 
+
+-- The main directory 
+ 
+        $ mkdir hello_world
+
+-- The main source file
+
+        $ touch HelloWorld.cpp
+        
+-- The compilation file
+        
+        $ touch CMakeLists.txt
+
+-- The world including the plugin
+
+        $ touch hello_world_plugin.sdf
+
+2) Fill the _HelloWorld.cpp_
+- We'll use a string and the ignmsg command below for a brief example.
+```
+#include <string>
+#include <gz/common/Console.hh>
+```
+- This header is required to register plugins, to be discovered to the Gazebo system
+```
+#include <gz/plugin/Register.hh>
+```
+- The System header is integrated to interface with the Gazebo system
+```
+#include <gz/sim/System.hh>
+```
+- It's good practice to use a custom namespace for your project.
+```
+namespace hello_world
+{
+```
+- This is the main plugin's class. It must inherit from System and at least one other interface. Here we use `ISystemPostUpdate`, which is used to get results after physics runs. 
+ ```
+  class HelloWorld:
+    public gz::sim::System,
+    public gz::sim::ISystemPostUpdate
+  {
+```
+- Plugins inheriting ISystemPostUpdate must implement the PostUpdate callback. This is called at every simulation iteration after the physics updates the world. The _info variable provides information such as time, while the _ecm provides an interface to all entities and components in simulation
+```
+    public: void PostUpdate(const gz::sim::UpdateInfo &_info,
+                const gz::sim::EntityComponentManager &_ecm) override;
+  };
+}
+```
+- This is required to register the plugin. Make sure the interfaces match what's in the header.
+```
+IGNITION_ADD_PLUGIN(
+    hello_world::HelloWorld,
+    gz::sim::System,
+    hello_world::HelloWorld::ISystemPostUpdate)
+
+using namespace hello_world;
+```
+- Here we implement the PostUpdate function, which is called at every iteration.
+```
+void HelloWorld::PostUpdate(const gz::sim::UpdateInfo &_info,
+    const gz::sim::EntityComponentManager &/*_ecm*/)
+{
+```
+- This is a simple example of how to get information from UpdateInfo. Based on the status of the simulation (paused or not), we write a message on the terminal about the status. 
+```
+  std::string msg = "Hello, world! Simulation is ";
+  if (!_info.paused)
+    msg += "not ";
+  msg += "paused.";
+  ignmsg << msg << std::endl;
+}
+```
+3) Fill the CMakeLists.txt file, to directly compile the plugin
+```
+cmake_minimum_required(VERSION 3.10.2 FATAL_ERROR)
+find_package(ignition-cmake2 REQUIRED)
+project(Hello_world)
+```
+- We must find the compilation libraries and objects of the Gazebo toolkit. We can do this with the _ign_find_package_ keyword.
+```
+ign_find_package(ignition-plugin1 REQUIRED COMPONENTS register)
+set(IGN_PLUGIN_VER ${ignition-plugin1_VERSION_MAJOR})
+ign_find_package(ignition-gazebo6 REQUIRED)
+set(IGN_GAZEBO_VER ${ignition-gazebo6_VERSION_MAJOR})
+```
+- A plugin is a library (it has not a main function). 
+```
+add_library(HelloWorld SHARED HelloWorld.cpp)
+set_property(TARGET HelloWorld PROPERTY CXX_STANDARD 17)
+target_link_libraries(HelloWorld
+  PRIVATE ignition-plugin${IGN_PLUGIN_VER}::ignition-plugin${IGN_PLUGIN_VER}
+  PRIVATE ignition-gazebo${IGN_GAZEBO_VER}::ignition-gazebo${IGN_GAZEBO_VER})
+```
+4) Create an SDF file to include the plugin. 
+```
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <world name="default">
+```
+- Plugin filename: the one included in the CMakeLists.txt
+- Plugin name: the class specified in the source file
+```
+    <plugin filename="HelloWorld" name="hello_world::HelloWorld">
+    </plugin>
+  </world>
+</sdf>
+```
+5) Compile the plugin. This compilation is not based on colcon
+```  
+$ cd hello_world
+$ mkdir build
+$ cd build
+$ cmake ..
+$ make
+$ cd ..
+```  
+6) Discover the plugin. This is made by setting the _GZ_SIM_SYSTEM_PLUGIN_PATH_ environment variable. This kinds of variable live only in the space where they are assigned. So we should export this variable in every terminal where the sdf world file is executed. Later we will see how to automatize this step
+```
+$ export GZ_SIM_SYSTEM_PLUGIN_PATH=`pwd`/build
+``` 
+7) Start the simulation. We must specify the sdf file, and the verbosity level. To print out data on terminal, the lowest verbosity level is 3.
+``` 
+$ ign gazebo -v 3 hello_world_plugin.sdf
+``` 
+Now you can check the terminal, how the message changes based on the start/stop status of the simulation. 
+
+8) Avoid to create problems to the colcon compilation system. Now the _hello_world_ directory is in our ROS 2 software pool. This means that colcon will try to compile it. But this is not a ROS 2 package, so it will return an error. To avoid the compilation of this directory, create in its root an empty file called: COLCON_IGNORE
+
+#### Gazebo Plugin <-> ROS 2 integration
+Let's slightly modify the latter example to publish the status of the simulation not on the terminal but on a ROS 2 topic. In addition, we will use a launch file to start the simualtion.
+
+1) Create a ROS 2 package 
+``` 
+$ ros2 pkg create hello_world_ros rclcpp std_msgs 
+``` 
+2) Create the needed directories 
+``` 
+$ cd hello_world_ros
+$ mkdir launch
+$ mkdir world
+$ touch launch/hello_world_ros.launch.py
+$ touch world/hello_world_ros_plugin.sdf
+$ touch src/hello_world_ros.cpp
+``` 
+
+3) Fill the source code. This will be very similar to the previous one, let's highlight the difference with respect to the previous one.
+-- Include the ROS 2 headers
+``` 
+#include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/string.hpp"
+```
+```
+#include <gz/sim/System.hh>
+#include <gz/common/Console.hh>
+#include <gz/plugin/Register.hh>
+
+namespace hello_world {
+   class HelloWorldROS:
+    public gz::sim::System,
+```
+-- In addition to the PostUpdate function, we will implement the Configure function. This is used to configure the environment of the plugin.
+```
+    public gz::sim::ISystemConfigure,
+    public gz::sim::ISystemPostUpdate {
+    
+    public: void PostUpdate(const gz::sim::UpdateInfo &_info,
+                const gz::sim::EntityComponentManager &_ecm) override;
+    public: void Configure(const gz::sim::Entity &_id,
+                            const std::shared_ptr<const sdf::Element> &_sdf,
+                            gz::sim::EntityComponentManager &_ecm,
+                            gz::sim::EventManager &_eventMgr) final;
+```
+-- Declare a pointer to the ROS 2 node. We will fill this object with the memory address of a ROS 2 node initialized object. Then we will create the publisher object.
+```
+    private: rclcpp::Node::SharedPtr _ros_node; 
+    private: rclcpp::Publisher<std_msgs::msg::String>::SharedPtr _publisher;
+  };
+}
+IGNITION_ADD_PLUGIN(
+    hello_world::HelloWorldROS,
+    gz::sim::System,
+    hello_world::HelloWorldROS::ISystemConfigure,
+    hello_world::HelloWorldROS::ISystemPostUpdate)
+
+using namespace hello_world;
+```
+-- Another function from the Gazebo tools is used the Configure function. This function is called when the plugin is loaded. Differently from the PostUpdate, called every time that the simulation iterates, the configure function is called just once.
+```
+void HelloWorldROS::Configure(const gz::sim::Entity &_entity,
+    
+    const std::shared_ptr<const sdf::Element> &_sdf,
+    gz::sim::EntityComponentManager &/*_ecm*/,
+    gz::sim::EventManager &/*_eventMgr*/) {
+```
+-- In this function, we initialize the ROS 2 node without any argument (we don't have argc and argv)
+```
+    rclcpp::init(0, nullptr);
+    _ros_node = rclcpp::Node::make_shared("hello_world_ros_plugin");
+    _publisher = _ros_node->create_publisher<std_msgs::msg::String>("topic", 10);
+}
+```
+```
+void HelloWorldROS::PostUpdate(const gz::sim::UpdateInfo &_info, const gz::sim::EntityComponentManager &/*_ecm*/) {
+    std::string msg = "Hello, world! Simulation is ";
+    if (!_info.paused)
+        msg += "not ";
+    msg += "paused.";
+```
+-- The ROS 2 string message is initialized, filled and published.
+```
+    auto message = std_msgs::msg::String();
+    message.data = msg;
+    _publisher->publish( message );
+}
+```
+4) Fill the CMakeLists.txt. Starting from the one auto-generated from the ROS2 pkg create command, we must fuse the compilation instruction used from the Gazebo compilation. 
+
+```
+cmake_minimum_required(VERSION 3.8)
+project(hello_world_ros)
+
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+# find dependencies
+find_package(ament_cmake REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(rclcpp REQUIRED)
+```
+- We must add the ignition-cmake2 package and the other components, we can copy and past these from the previous example
+```
+find_package(ignition-cmake2 REQUIRED)
+ign_find_package(ignition-plugin1 REQUIRED COMPONENTS register)
+set(IGN_PLUGIN_VER ${ignition-plugin1_VERSION_MAJOR})
+ign_find_package(ignition-gazebo6 REQUIRED)
+set(IGN_GAZEBO_VER ${ignition-gazebo6_VERSION_MAJOR})
+```
+- We don't need an executable, but a library. Add this library, then, add to it the additional exteranl libraries
+```
+add_library(HelloWorldROS SHARED src/hello_world_ros.cpp)
+target_link_libraries(HelloWorldROS 
+  ignition-plugin${IGN_PLUGIN_VER}::ignition-plugin${IGN_PLUGIN_VER}
+  ignition-gazebo${IGN_GAZEBO_VER}::ignition-gazebo${IGN_GAZEBO_VER}
+)
+```
+- And add the ROS 2 dependencies (thanks to the ament compilation system)
+```
+ament_target_dependencies(HelloWorldROS rclcpp std_msgs)
+```
+- Install the directories used in the launch process
+```
+install(DIRECTORY launch world DESTINATION share/${PROJECT_NAME})
+```
+```
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  # the following line skips the linter which checks for copyrights
+  # comment the line when a copyright and license is added to all source files
+  set(ament_cmake_copyright_FOUND TRUE)
+  # the following line skips cpplint (only works in a git repo)
+  # comment the line when this package is in a git repo and when
+  # a copyright and license is added to all source files
+  set(ament_cmake_cpplint_FOUND TRUE)
+  ament_lint_auto_find_test_dependencies()
+endif()
+
+ament_package()
+```
+5) Fill the sdf world file. This is exactly the same of the previous example, we must just change the plugin.
+```
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <world name="default">
+    <plugin filename="HelloWorldROS" name="hello_world::HelloWorldROS">
+    </plugin>
+  </world>
+</sdf>
+```
+6) Fill the launch file. Here we start the world but also set the environment. 
+```
+import os
+from launch import LaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch_ros.substitutions import FindPackageShare
+from launch.actions import IncludeLaunchDescription, SetEnvironmentVariable
+from launch.substitutions import PathJoinSubstitution
+
+
+def generate_launch_description():
+    ld = LaunchDescription()
+```
+-- We want to start with the sdf file defined above. We find the path of the shared package, setting the _hello_world_ros_plugin.sdf_. This path is used in the input arguments of the gazebo launch file. 
+```
+    sdf_file_path = os.path.join(
+        FindPackageShare('hello_world_ros').find('hello_world_ros'),
+        'world',
+        'hello_world_ros_plugin.sdf'
+    )
+    gazebo_node = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution([
+                FindPackageShare('ros_gz_sim'),
+                'launch',
+                'gz_sim.launch.py'
+            ])
+        ),
+        launch_arguments={
+            'gz_args': f'-r -v 3 {sdf_file_path}'
+        }.items()
+    )
+
+```
+-- What misses...? The export of the plugin path. We can directly do it in the launch file. In this way, we can avoid to link our plugin to specific system configurations. Let's retrieve the build directory of the ROS 2 workspace and the _hello_world_ros_ subfolder. 
+```
+    workspace_dir = os.getenv("ROS_WORKSPACE", default=os.getcwd())
+    plugin_dir = os.path.join(workspace_dir, "build/hello_world_ros")    
+```
+-- The _SetEnvironmentVariable_ function can be used for this scope. Remember to add the element we are creating with this function in the action list of the LaunchDescription. 
+```
+
+    ign_resource_path = SetEnvironmentVariable(
+        name='GZ_SIM_SYSTEM_PLUGIN_PATH',
+        value=[plugin_dir]
+    )
+    
+    ld.add_action( ign_resource_path)
+    ld.add_action( gazebo_node)
+
+    return ld
+``` 
+7) Compile the workspace and launch the node
+``` 
+$ colcon build --symlink-install
+$ source install/setup.bash
+$ ros2 launch hello_world_ros hello_world_ros.launch.py
+$ ros2 topic echo /topic
+``` 
+__Be Careful__: if the system doesn't find the proper plugin, it will start the simulation anyway. No error are returned but of course, the system will not work as expected. 
+
+### Publish on Gazebo topic
+This last example still integrates ROS 2 and Gazebo, by controlling the differential drive robot by directly publishing on the Gazebo topic inside the plugin implementation. We will reproduce the behaviour of the ROS 2 bridge (it is just an example). The flow is:
+-- Publish on a ROS 2 Topic called _cmd_vel_from_ros_
+-- The _cmd_vel_from_ros_ is read from the Gazebo plugin
+-- The data on the topic is managed and published on the Gazboe /cmd_vel topic
+
+__Note__: we will add this plugin to a robot model. Let's add the urdf robot model of the differential drive robot here. 
+
+1) Create the package
+``` 
+$ ros2 pkg create cmd_vel_plugin rclcpp std_msgs geometry_msgs 
+``` 
+2) Let's create the structure
+``` 
+$ cp -r diff_drive_description/urdf/ cmd_vel_plugin/
+$ mkdir launch
+$ touch src/pub_vel_cmd.cpp
+``` 
+3) Fill the source
+-- As you can guess, the source is quite similar to the previous one, let's discuss the main differences
+``` 
+#include "rclcpp/rclcpp.hpp"
+#include <gz/sim/System.hh>
+#include <gz/common/Console.hh>
+#include <gz/plugin/Register.hh>
+#include <sdf/sdf.hh>
+``` 
+-- The Node header and the twist version of Gazebo are used to publish data
+``` 
+#include <gz/transport/Node.hh>
+#include <geometry_msgs/msg/twist.hpp>
+``` 
+-- Let's define the namespace
+``` 
+namespace cmd_vel_plugin {
+   class PubCmdVel:
+    public gz::sim::System,
+    public gz::sim::ISystemConfigure,
+    public gz::sim::ISystemPostUpdate {
+    
+    public: void PostUpdate(const gz::sim::UpdateInfo &_info,
+                const gz::sim::EntityComponentManager &_ecm) override;
+    public: void Configure(const gz::sim::Entity &_id,
+                            const std::shared_ptr<const sdf::Element> &_sdf,
+                            gz::sim::EntityComponentManager &_ecm,
+                            gz::sim::EventManager &_eventMgr) final;
+``` 
+-- Define the callback of the velocity message
+``` 
+    public: void cmd_vel_cb( const geometry_msgs::msg::Twist );
+``` 
+```
+    private: rclcpp::Node::SharedPtr _ros_node; 
+    private: rclcpp::Publisher<std_msgs::msg::String>::SharedPtr _publisher;
+``` 
+-- Define the subscriber 
+```
+
+    private: rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr _subscriber;
+    private: gz::transport::Node::Publisher _gz_cmdVelPub;
+``` 
+-- Define the Gazebo node object and the twist message (still gazebo side) 
+```
+    private: gz::transport::Node _gz_node;
+    private: gz::msgs::Twist _cmdVelMsg;
+  };
+}
+
+
+IGNITION_ADD_PLUGIN(
+    cmd_vel_plugin::PubCmdVel,
+    gz::sim::System,
+    cmd_vel_plugin::PubCmdVel::ISystemConfigure,
+    cmd_vel_plugin::PubCmdVel::ISystemPostUpdate)
+
+using namespace cmd_vel_plugin;
+``` 
+-- In the callback of the velocity message, published in the ROS 2 network, we saturate the linear and angular velocities to 0.2 and 0.5.
+```
+void PubCmdVel::cmd_vel_cb( const geometry_msgs::msg::Twist t) {
+    double vx = (t.linear.x < 0.2) ? t.linear.x : 0.2; 
+    _cmdVelMsg.mutable_linear()->set_x (vx);
+    double vz = (t.angular.z < 0.5) ? t.angular.z : 0.5;
+    _cmdVelMsg.mutable_angular()->set_z(vz);
+}
+``` 
+```
+void PubCmdVel::Configure(const gz::sim::Entity &_entity, 
+    const std::shared_ptr<const sdf::Element> &_sdf, gz::sim::EntityComponentManager &/*_ecm*/,
+    gz::sim::EventManager &/*_eventMgr*/) {
+
+    rclcpp::init(0, nullptr);
+    _ros_node = rclcpp::Node::make_shared("cmd_vel_plugin");
+``` 
+-- Create the subscriber to the ROS 2 message and the publisher to the /cmd_vel Gazebo topic
+```
+    _subscriber = _ros_node->create_subscription<geometry_msgs::msg::Twist>("/cmd_vel_from_ros", 10, std::bind(&PubCmdVel::cmd_vel_cb, this, std::placeholders::_1));
+    _gz_cmdVelPub = _gz_node.Advertise<gz::msgs::Twist>("/cmd_vel");
+}
+``` 
+-- In the Update function, publish the message. We also have to call the spin function: the spin function allow the callbacks to work properly. We can use the sping_some on the ROS 2 node to avoid the blocking behaviour of the spin.
+```
+void PubCmdVel::PostUpdate(const gz::sim::UpdateInfo &_info, const gz::sim::EntityComponentManager &/*_ecm*/) {    
+    rclcpp::spin_some( _ros_node );
+    _gz_cmdVelPub.Publish(_cmdVelMsg);
+}
+``` 
+
+
+
+
+
 
 
 # ros2_control and Gazebo
