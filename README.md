@@ -1,53 +1,92 @@
-# ROSCon_Es 2024 tutorial on Gazebo and ros2_control
+# ROSCon_Es 2024 tutorial: Modern Gazebo y integraciòn con ros2_control
 
-This repo contains the source code to follow the ROSConES 2024 tutorial entitled: _Tutorial de Gazebo e integración con ros2_control_ made by Jonathan Cacace from __Eurecat__ robotics Unit
-__Time schedule__ 19 de septiembre de 2024, 9.30-11.30 - 
+Este repository contiene el código fuente para seguir el tutorial de ROSConES 2024 titulado: _Tutorial de Gazebo e integración con ros2_control_ realizado por Jonathan Cacace de la __Unidad de Robótica de Eurecat__  
+__Horario__: 19 de septiembre de 2024, 9:30-11:30
 
-## Getting started
-### Requirements
-The tutorial is designed for ROS2-Humble (LTS). You can install it on your system (ubuntu 22.04), or on a docker container. The repository contains the files needed to create the Docker image and instantiate the container. 
+## Empezando
+### Requisitos
+El tutorial está diseñado para ROS2-Humble (LTS). Puedes instalarlo en tu sistema (Ubuntu 22.04) o en un contenedor Docker. El repositorio contiene los archivos necesarios para crear la imagen Docker e instanciar el contenedor.
 
-### Get the repository
-You can download this repository whenever you want into your system. Assume to clone it into you home folder.
-		
+### Descargar el repositorio
+Puedes descargar este repositorio en cualquier lugar en tu sistema. Se asume que lo clonarás en tu carpeta personal (home)
+
 		$ cd ~ 
 		$ git clone https://github.com/jocacace/ROSConES.git
 
-### Build and run the image
+### Build y ejecutar la imagen
 	
 		$ cd ROSConES/Docker 		
 		$ docker build -t ros2roscon .		
 		$ docker compose up # You will lose the control of this terminal tab
-To attach a new terminal to this docker container use the _docker exec_ command
-	
+
+Para adjuntar un nuevo terminal a este contenedor Docker, usa el comando _docker exec_	
+
 		$ docker exec -it ros2roscon_container bash
 
-This last command opens the door for the docker container in the upper level of the Docker folder. This will be your ROS2 workspace. For example, here you can compile the workspace:
+Este último comando abre el acceso al contenedor Docker en el nivel superior de la carpeta Docker. Este será tu espacio de trabajo de ROS 2 (la ros workspace). Por ejemplo, aquí puedes compilar el espacio de trabajo:
 
-		$ source /opt/ros/humble/setup.bash
 		$ colcon build --symlink-install
-Now you can start compiling and running the examples!
+    $ source /opt/ros/humble/setup.bash
+		
+Ahora puedes comenzar a compilar y ejecutar los ejemplos!
 
-## Part 1: Getting started with modern Gazebo (Fortress (v6))
-## Starting Gazebo
-The interface between the terminal and Gazebo is implemented via the _ign_ command
+### Indice
+
+PART 1:
+- [Introducciòn a Gazebo](#introducciòn-a-gazebo)
+- [Example 1: Key Publisher in Gazebo](#key-publisher-from-gazebo)
+- [Example 2: Spawn un objecte en la simulación](#spawn-an-object-in-the-scene)
+- [Example 3: Agregar un sensor en gazebo](#sensores)
+- [Example 4: ROS2 Bridge](#ros2-bridge)
+- [Example 5: Differential drive robot](#differential-drive-robot)
+- [Example 6: Gazebo plugin](#gazebo-plugin)
+
+PART 2:
+- [ros2_control and Gazebo](#ros2_control-and-gazebo)
+- [Develop a custom controller](#develop-a-custom-controller)
+
+
+
+## Parte 1: Empezamos con modern Gazebo (Fortress)
+
+## Instalación de Gazebo
+
+Para instalar Gazebo, si no usas Docker, ejecuta los siguientes comandos:
+
+```
+$ sudo wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg 
+
+$ sudo echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null 
+
+$sudo apt-get update 
+
+$sudo apt-get install ignition-fortress ros-humble-ros-ign-bridge ros-humble-ros-gz ros-humble-controller-manager ros-humble-ros2-control ros-humble-ros2-controllers 
+ros-humble-ign-ros2-control -y
+```
+
+## Introducciòn a Gazebo 
+Puedes interactuar con la simulación de Gazebo utilizando el terminal de Linux con el comando: ign.
 
 	The 'ign' command provides a command line interface to the ignition tools.
 		ign <command> [options]
-To start the simulator use:
+
+Para comenzar la simulacion:
 		
 		$ ign gazebo
-This will open a welcome page where you can select to start a Gazebo scene, or an empty scene. This scene is quite unusable, it misses also the ground plan (try to include a new object in the environment, it falls down).
-To open directly an empty scene use this command:
+
+Esto abrirá una página de bienvenida donde puedes seleccionar una escena lista o una escena vacía. Esta escena es bastante inutilizable, ya que también le falta el plano del suelo (Si agregas un objeto a la escena, caerá.).
+Para abrir directamente una escena vacía, usa este comando:
+
 
 		$ ign gazebo empty.sdf
 
-This is a better starting point. In this window, apart from the main stage, there are GUI elements: 
-- World: all the elements
-- Entity tree: the objects
+Este es un mejor punto de partida. En esta ventana, además del escenario principal, hay elementos de la interfaz gráfica:  
+- **World**: todos los elementos  
+- **Entity Tree**: los objetos
 
 ## Gazebo topics
-Internally, Gazebo shares information using topics, exactly like ROS 2. We will use this information to integrate ROS 2 and Gazebo later. Some commands are useful to understand the data active in the system:
+Internamente, Gazebo comparte información utilizando topics, exactamente como ROS 2. Usaremos esta información para la integraciòn de ROS 2 y Gazebo luego. Algunos comandos son útiles para entender los datos activos en el sistema:
+
 
 	$ ign topic
 		Options:
@@ -66,29 +105,36 @@ Internally, Gazebo shares information using topics, exactly like ROS 2. We will 
 				    -e,--echo                   		
 				    -p,--pub TEXT Needs: --topic --msgtype
 
-For example, to list the active topics:
+Por ejemplo, para listar los topicos activos:
+		
+    $ ign topic -l
 
-		$ ign topic -l
-
-## Example 1: Key Publisher from Gazebo
-- Open Gazebo with an empty scene
+## Example 1: 
+## Key Publisher from Gazebo
+- Abre Gazebo con una escena vacía
 
 		$ ign gazebo empty.sdf
-- Add the Key Publisher plugin: click on the 3 vertical dots -> search and click on the Key Publisher plugin
-- Start the simulation with the play button
-- On a terminal, check for the current active topics:
+
+- Añade el plugin Key Publisher: 
+  - haz clic en los 3 puntos verticales -> busca y selecciona el plugin Key Publisher
+
+- Inicia la simulación con el botón de reproducción
+
+- En un terminal, verifica los temas activos actuales:
 
 		$ ign  topic -l
-- Ask for the content of the topic: _/keyboard/keypress_
+- Escucha el contenido del topico: _/keyboard/keypress_
 
 		$ ign topic -e -t /keyboard/keypress
-- Now, using the keyboard on the Gazebo scene and check the output on the terminal. 
+- Ahora, usa el teclado en la escena de Gazebo y verifica el output en el terminal.
 
-We have now the basic elements to use Gazebo with ROS2.
+Ahora tenemos los elementos básicos para usar Gazebo con ROS2.
 
-## Example 2: Spawn an object in the scene
-Gazebo is a standalone software and it is agnostic to ROS 2. It support _SDF_ file as object model: a robot or a static object - _SDF_ stands for _Simulation Description Format_. You can find only different simulations with complex robots using directly the _SDF_. However, for a deeper integration with ROS we prefer the use of _URDF_ file format. 
-Let's create a new package storing the model of a simple object and its launch file:
+## Example 2: 
+## Spawn an object in the scene
+Gazebo es un software independiente y es agnóstico a ROS 2. Soporta SDF como modelo de objeto: un robot o un objeto estático. SDF significa Simulation Description Format. Puedes encontrar diferentes simulaciones con robots complejos que utilisan directamente SDF. Sin embargo, para una integración más profunda con ROS, preferimos el uso del formato de archivo URDF.el espacio de trabajo
+
+Vamos a crear un nuevo paquete que vas a contar  el modelo de un objeto simple y su launch file:
 
 	$ ros2 pkg create spawn_simple_object --dependencies xacro
 	$ cd spawn_simple_object
@@ -96,7 +142,7 @@ Let's create a new package storing the model of a simple object and its launch f
 	$ mkdir urdf
 	$ cd urdf && touch cube.urdf.xacro
 
-The robot model is the following one. It is just one link, composed by the base link shaped as a cube.
+El modelo del robot es el siguiente. Es solo un link con la forma de un cubo.
 ```
 <?xml version="1.0"?>
 <robot name="cube" xmlns:xacro="http://www.ros.org/wiki/xacro">
@@ -124,8 +170,10 @@ The robot model is the following one. It is just one link, composed by the base 
   </link>
 </robot>
 ```
-A launch file is used to start add the robot to the simulation:
-- Import salient modules
+
+Utilizamos un launch file para añadir el robot a la simulación. Vamos a escribir esto file. 
+
+- Empezamos importando los módulos relevantes
 ```
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
@@ -136,7 +184,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch.substitutions import  Command
 from launch_ros.substitutions import FindPackageShare
 ```
-- Retrieve the robot mode file (the xacro)
+- Recupera el archivo del modelo del robot (el xacro)
 ```
 def generate_launch_description():
 
@@ -158,7 +206,7 @@ def generate_launch_description():
         }]
     )
 ```
-- Spwan the robot starting from the robot_description topic
+- Spwan el robot a partir dal topic _robot_description_
 ```
     spawn_node = Node(package='ros_gz_sim', executable='create',
                  arguments=[
@@ -172,7 +220,7 @@ def generate_launch_description():
                     '-topic', '/robot_description'],
                  output='screen')
 ``` 
-- Start the Gazebo simulation
+- Añadamos el módulo para iniciar la simulación:
 ```
     ignition_gazebo_node = IncludeLaunchDescription( PythonLaunchDescriptionSource(
                 [PathJoinSubstitution([FindPackageShare('ros_gz_sim'),
@@ -186,27 +234,30 @@ def generate_launch_description():
     ld.add_action( ignition_gazebo_node )
     return ld
 ```
-Modify the CMakeLists.txt
+- Instalamos los directorios del paquete con el _CMakeLists.txt_
 ```
 install(DIRECTORY launch urdf DESTINATION share/${PROJECT_NAME})
 ```
-Compile and source the workspace, before to start the simulation
+Ahora puede compilar y cargar la  ROS workspace antes de iniciar la simulación
 
     $ colcon build --symlink-install
     $ source install/setup.bash
     $ ros2 launch spawn_simple_object spawn_model.launch.py 
 
-### Example 3: Sensors
-Let's complicate our model by adding additional sensors. In particular, a standard camera, a depth camera and a lidar sensor. The sensors are added to the same cube. A input parameter from launch file define which sensor use in the simulation.
-This package use the _realsense2-camera_ and _realsense2-description_ packages to simulate the depth sensor. 
+## Example 3: 
+## Sensores
+Complicaremos nuestro modelo añadiendo algun sensores adicionales. En particular, una cámara estándar, una cámara de profundidad y un sensor lidar. Los sensores se añaden al mismo cube que simulamos antes. 
+Un parámetro de input a las launch file define qué sensor usar en la simulación.
+Este paquete utiliza los paquetes _realsense2-camera_ y _realsense2-description_ para simular el sensor de profundidad.
 
     $ sudo apt-get install ros-humble-realsense2-camera
     $ sudo apt-get install ros-humble-realsense2-description
     
-Create the _gazebo_sensors_ package.
+Vamos a crear el nuevo paquete _gazebo_sensors_.
     $ ros2 pkg create gazebo_sensors --dependencies xacro realsense2_description
     
-#### Define the xacro 
+### Define el modelo (xacro) 
+Aqui tenemos algún parameters para decidir que sensore activar.
 ```
 <?xml version="1.0"?>
     <robot name="cube" xmlns:xacro="http://www.ros.org/wiki/xacro">
@@ -217,7 +268,7 @@ Create the _gazebo_sensors_ package.
         <xacro:property name="use_depth" value="$(arg use_depth)" />
         <xacro:property name="use_lidar" value="$(arg use_lidar)" />
 ```
-- Define the base_link and the sensor lonk, associated with a fixed joint
+- Vamos a definir el base_link y el sensor link, conectado con un fixed joint. Los sensores saran conectate con el sensor_link
 ```
     <link name="base_link">
         <visual>
@@ -268,7 +319,7 @@ Create the _gazebo_sensors_ package.
         <origin xyz="0 0 0.2" rpy="0.0 0.0 3.1415"/>
     </joint>
 ```
-- If the _use_camera_ param is true, include the camera sensor
+- Si el parámetro _use_camera_ està True, añade el sensor de la cámara
 ```
     <xacro:if value="${use_camera}">                        
         <gazebo reference="sensor_link">
@@ -299,7 +350,7 @@ Create the _gazebo_sensors_ package.
         </gazebo>
     </xacro:if>
 ```
-- If the _use_depth_ camera is true, add the vision sensor. 
+- Si el paràmetro _use_depth_ camera està true, añade el depth sensor. 
 ```
 xacro:if value="${use_depth}">         
         <gazebo reference="base_link">
@@ -336,7 +387,7 @@ xacro:if value="${use_depth}">
         </gazebo> 
     </xacro:if>
 ```
-- If the _use_lidar_ param is true, add the lidar sensor
+- Si el paràmetro _use_lidar_ esta True, añade el lidar.
 ```
     <xacro:if value="${use_lidar}">         
         <gazebo reference="sensor_link">
@@ -371,7 +422,8 @@ xacro:if value="${use_depth}">
         </gazebo>
     </xacro:if>
 ```
-- If at least one sensor is enabled, include the Gazebo-sensor plugin
+- Necesitamos añadir el plugin para los sensores tambien. En esta nueva versión de Gazebo, tenemos un plugin para todos los sensores. Recuerda en el Gazebo clásico, cada sensor tiene su propio plugin.
+
 ```
     <xacro:if value="${use_camera or use_depth or use_lidar}"  >
         <gazebo>
@@ -383,7 +435,7 @@ xacro:if value="${use_depth}">
         </gazebo>
     </xacro:if>
 ```
-#### Create the launch file~
+#### Creamos el launch file
 ```
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
@@ -397,15 +449,19 @@ import xacro
 import os
 from pathlib import Path
 ```
-- Get the robot description model, initializing it with the parameters. In the first case, the _use_camera_ is true.
+- Añadamos el modelo de descripción del robot, inicializando con los parámetros. En el primer caso, _use_camera_ esta True.
 ```
 def generate_launch_description():
     ld = LaunchDescription()
     xacro_path = 'urdf/cube_with_sensors.urdf.xacro'
  
+```
+- A partir del xacro, podemos instanciarlo con los parámetros.
+```
     robot_description = xacro.process_file( Path(os.path.join( get_package_share_directory('gazebo_sensors'), xacro_path ) ), mappings={'use_camera': "True", 'use_depth': "False", 'use_lidar': "False"})
 ```
-- Define the robot state publisher node. This node published the _robot_description_  topic.
+- Define el nodo de publicación del robot state publisher. Este nodo publicó el topic _robot_description_.
+
 ```
     robot_state_publisher_node = Node(
         package='robot_state_publisher',
@@ -413,11 +469,16 @@ def generate_launch_description():
         name='robot_state_publisher',
         output='screen',
         parameters=[{
+```
+- Hemos cargado la descripción del robot del xacro, esta ya traducida en URDF con los parámetros
+
+```
             'robot_description':robot_description.toxml()
         }]
     )
 ```
-- Spawn the robot. It is used the robot_description topic
+- Vamos a spawnar el robot. Se utiliza el tema _robot_description_
+
 ```
     spawn_node = Node(package='ros_gz_sim', executable='create',
                  arguments=[
@@ -431,7 +492,7 @@ def generate_launch_description():
                     '-topic', '/robot_description'],
                  output='screen')
 ```
-- Start Gazebo simulation.
+- El nodo para iniciar la simulacion
 ```    
     ignition_gazebo_node = IncludeLaunchDescription( PythonLaunchDescriptionSource(
                 [PathJoinSubstitution([FindPackageShare('ros_gz_sim'),
@@ -445,59 +506,70 @@ def generate_launch_description():
     ld.add_action( ignition_gazebo_node )
     return ld
 ```
-#### Modify the CMakeLists.txt
+### Vamos a crear el _CMakeLists.txt_
 ```
 install(DIRECTORY launch urdf DESTINATION share/${PROJECT_NAME})
 ```
-Now you can compile the workspace and launch the simulation
+### Ahora puedes compilar la ROS workspace y lanzar la simulación.
 
-    $ colcon build --symlink-install
-    $ source install/setup.bash
-    $ ros2 launch gazebo_sensors cube_with_sensors.launch.py
+      $ colcon build --symlink-install
+      $ source install/setup.bash
+      $ ros2 launch gazebo_sensors cube_with_sensors.launch.py
 
-For each sensor a Gazebo plugin can be used to check the output of the sensors:
+Para cada sensor hay un Gazebo plugin para comprobar el output de los sensores:
 - Image display (image and depth)
 - Visualize lidar
-- Check the topic published on ignition
+
+Check the topic published on ignition
     
         $ ign topic -l
 
-### Example 4: Bridge
-The data stremed on Gazebo are not useful if we can not use them using ROS 2. To transfer the data from Gazebo to ROS 2 we must use the _ros_gz_bridge_.
-The _ros_gz_bridge_ provides a network bridge which enables the exchange of messages between ROS 2 and Ignition Transport. Its support is limited to only certain message types. Not all of them are supported. The bridge can be used in two ways:
+### Example 4: 
+### ROS2 Bridge
+
+Los datos en Gazebo no son útiles si no podemos utilizarlos mediante ROS. Para transferir los datos de Gazebo a ROS 2 debemos utilizar el _ros_gz_bridge_.
+
+El bridge creará un puente que permite el intercambio de mensajes entre ROS e Gazebo. Su compatibilidad está limitada a determinados tipos de mensajes. No todos son compatibles ahora. 
+El bridge se puede utilizar de dos formas:
 - Command line ROS program
 - Launch file
 
+La sintaxis es 
 
-    $ ros2 run ros_gz_bridge parameter_bridge /TOPIC@ROS_MSG@GZ_MSG
+      $ ros2 run ros_gz_bridge parameter_bridge /TOPIC@ROS_MSG@GZ_MSG
 
-The ros2 run ros_gz_bridge parameter_bridge command simply runs the parameter_bridge code from the ros_gz_bridge package. Then, we specify our topic /TOPIC over which the messages will be sent. The first @ symbol delimits the topic name from the message types. Following the first @ symbol is the ROS message type.
+El comando ros2 run _ros_gz_bridge_ _parameter_bridge_ simplemente ejecuta el código parameter_bridge del paquete ros_gz_bridge. 
+Luego, especificamos el nuestro topic nombre /TOPIC utilizado para transmitir los mensajes. El primer símbolo @ delimita el nombre del tema de los tipos de mensajes. Después del primer símbolo @ se encuentra el tipo de mensaje de ROS.
 
-The ROS message type is followed by an @, [, or ] symbol where:
+El tipo de mensaje ROS va seguido de un símbolo @, [ o ] donde:
 
     @ is a bidirectional bridge.
     [ is a bridge from Gazebo to ROS.
     ] is a bridge from ROS to Ignition.
 
 #### A simple case: Publish key strokes to ROS
-- Start Gazebo and add the Key Publisher plugin: Aclick on the 3 vertical dots -> search and click on the Key Publisher plugin. 
-- Get the Gazebo message type 
+- Después haber iniciado Gazebo anda el plugin Key Publisher: 
+
+  - haga clic en los 3 puntos verticales -> busque y haga clic en el plugin Key Publisher.
+
+- Obtienes el tipo de mensaje Gazebo con este comando
     
         $ ign topic -i -t /keyboard/keypress
             Publishers [Address, Message Type]:
             tcp://172.18.0.1:37005, ignition.msgs.Int32
 
-- Start the bridge
+- Inicia el bridge
     
         $ ros2 run ros_gz_bridge parameter_bridge /keyboard/keyprs@std_msgs/msg/Int32[ignition.msgs.Int32
 
-- Listen the message on ROS
+- Escucha el messaje en ROS
 
         $ ros2 topic echo /keyboard/keyprs
         
 #### Bridge the Sensor data
-Let's create a launch file to stream the Gazebo topics. 
-1) Start the simulation and get the info about the topics we want to bridge on ROS 2
+Vamos a crear un launch file que inicializa los tres bridges para los tre sesores.
+
+1) Inicie la simulación y obtenga la información sobre los topics que queremos abordar en ROS 2
 
         $ ros2 launch gazebo_sensors cube_with_sensors.launch.py 
 
@@ -526,7 +598,7 @@ Let's create a launch file to stream the Gazebo topics.
             Publishers [Address, Message Type]:
             tcp://172.18.0.1:42637, ignition.msgs.LaserScan
 
-2) Create a launch file for the bridge: _gazebo_bridge.launch.py_ 
+2) Vamos a crear un launch file para iniciar el bridge: _gazebo_bridge.launch.py_ 
 
 ```
 from launch import LaunchDescription
@@ -545,7 +617,7 @@ def generate_launch_description():
                 '/cube_depth/image_raw/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked',
                 ],
 ```
-We can remap the topic to change the name of the data published by Gazebo, to adapt it to the rest of the ROS2 system.
+- Tambien, podemos mapear el topic para cambiar el nombre de los datos publicados por Gazebo, para adaptarlo al resto del sistema ROS2.
 ```
         remappings=[
             ("/lidar", "/cube/lidar"),
@@ -553,16 +625,14 @@ We can remap the topic to change the name of the data published by Gazebo, to ad
         output='screen'
     )
 ```
-We need to manually publish the tf from the sensor output to the base frame for the camera
+- Necesitamos publicar manualmente la transformación de el output del sensor al base frame de la cámara de profundidad y de el lidar. En esta manera podems visualizar todo los datos en el robot base frame
 ```
  depth_cam_data2sensor_link = Node(package='tf2_ros',
                     executable='static_transform_publisher',
                     name='cam3Tolink',
                     output='log',
                     arguments=['0.0', '0.0', '0.0', '0.0', '0.0', '0.0', 'sensor_link', 'cube_with_sensors/base_link/d435_depth'])
-```
-And for the lidar
-```
+
     lidar2sensor_link = Node(package='tf2_ros',
                     executable='static_transform_publisher',
                     name='cam3Tolink',
@@ -575,24 +645,29 @@ And for the lidar
         lidar2sensor_link
     ])
 ```
-3) Use ROS 2 tool to visualize the data
+3) Ahora podemos usar rqt para visualizar los datos. En el docker ya esta todo instalado. Sin embargo, tu puede instalar todo los que necesita con este comandos
 - rqt: 
 
         $ sudo apt-get install ros-humble-rqt-*
         $ ros2 run rqt-image-view rqt-image-view
 - rviz2
--- with this it is possible to visualize the lidar and the point clouds adding the proper plugin from the add plugin panel.
 
-### Example 5: Differential drive robot
-Let's start implementing our first mobile robot. This will also introduce us to the ros2 controllers. 
-Create a robot with 2 passive wheels and 2 active wheels. 
+  - Con Rviz2 es posible visualizar el lidar y los PointClouds simplemented añadendo el plugin adecuado utilisando el plugin menu
 
-    $ ros2 pkg create diff_drive_description --dependencies xacro
-    $ mkdir diff_drive_description/urdf
-    $ mkdir diff_drive_description/launch
+## Example 5: 
+## Differential drive robot
 
-1) Create a macro file and a main xacro file
--- Define a set of of macro to create the robot model, the inertia of the cylinder and others.
+Comencemos a implementar nuestro primer robot móvil. Esto también permitirá empezar con los robot controladores.
+
+- Vamos a crear un robot con 2 ruedas pasivas y 2 ruedas activas.
+
+      $ ros2 pkg create diff_drive_description --dependencies xacro
+      $ mkdir diff_drive_description/urdf
+      $ mkdir diff_drive_description/launch
+
+1) Crea dos archivos: uno para contener los macros y uno por el xacro principal
+
+- Vamos a definir los macros para crear el modelo del robot, la inercia del cilindro y otros.
 ```
 <?xml version="1.0"?>
 <robot name="diff_robot" xmlns:xacro="http://www.ros.org/wiki/xacro">
@@ -611,7 +686,7 @@ Create a robot with 2 passive wheels and 2 active wheels.
                 izz="${m*r*r/2}" /> 
     </xacro:macro>
 ```
--- Define the passive wheel joint. It is a fixed joint. We need of this wheel for a correct orientatoin of the base
+
 ```
     <xacro:macro name="passive_wheel_joint" params="name parent child *origin">
       <joint name="${name}" type="fixed" >
@@ -621,7 +696,7 @@ Create a robot with 2 passive wheels and 2 active wheels.
       </joint>
     </xacro:macro>
 ```
--- The passive wheel is a spherical object
+
 ```
     <xacro:macro name="passive_wheel_link" params="name *origin">
         <link name="${name}">
@@ -648,7 +723,7 @@ Create a robot with 2 passive wheels and 2 active wheels.
         </link>
     </xacro:macro>
 ```
--- Define the active wheel. A cylinder with a continuous rotational joint
+
 ```
   <xacro:macro name="wheel" params="side parent translateX translateY"> 
     <link name="${side}_wheel">
@@ -688,14 +763,14 @@ Create a robot with 2 passive wheels and 2 active wheels.
   </xacro:macro>
 </robot>
 ```
--- We can create now the _xacro_ file. First include the macro file description
+-- Ahora podemos crear el archivo _xacro_. Primero incluya el archivo de macro
 ```
 <?xml version="1.0"?>
 
 <robot name="diff_robot" xmlns:xacro="http://ros.org/wiki/xacro">
 <xacro:include filename="$(find diff_drive_description)/urdf/diff_drive_macro.xacro" /> 
 ```
--- Some parameters define the base shape
+-- Definimos alcun parametros
 ```
     <xacro:property name="base_radius" value="0.15" /> 
     <xacro:property name="passive_wheel_height" value="0.04" /> 
@@ -705,7 +780,7 @@ Create a robot with 2 passive wheels and 2 active wheels.
     <xacro:property name="wheel_height" value="0.02" />
     <xacro:property name="wheel_mass" value="2.5" /> 
 ```
--- Base link
+--Y la structura del robot
 ```
 	<link name="base_link">
 		<inertial>
@@ -729,7 +804,7 @@ Create a robot with 2 passive wheels and 2 active wheels.
 		</collision>     
 	</link>
 ```
--- Add the passive wheels
+
 ```
 	<xacro:passive_wheel_joint name="passive_wheel_front_joint"
 		parent="base_link"
@@ -753,12 +828,12 @@ Create a robot with 2 passive wheels and 2 active wheels.
 			<origin xyz="0.02 0.02 0 " rpy="${M_PI/2} 0 0" /> 
 	</xacro:passive_wheel_link>
 ```
--- Add the wheels
+
 ```
 	<xacro:wheel side="right" parent="base_link" translateX="0" translateY="-${base_radius}" />
 	<xacro:wheel side="left" parent="base_link" translateX="0" translateY="${base_radius}" />
 ```
--- Add the lidar sensor
+
 ```
 	<link name="lidar_link">
 		 <visual>
@@ -789,7 +864,7 @@ Create a robot with 2 passive wheels and 2 active wheels.
     </joint>
 
 ```
--- Add the Gazebo-sensor 
+
 ```
 	  <gazebo reference="lidar_link">
         <sensor name="lidar" type='gpu_lidar'>
@@ -824,9 +899,10 @@ Create a robot with 2 passive wheels and 2 active wheels.
         </sensor>
     </gazebo>
 ```
--- Add two plugnis:
---- __Sensor plugin__: to stream the Lidar data
---- __Differential drive plugin__: to control the base velocity, translating such velocity to wheels velocity
+  - Este robot tiene dos sensores
+    - __Sensor plugin__: con esto transmitimos el lidar sensor  
+    - __Differential drive plugin__: con esto controlamos la velocidad de la base, traduciendo esta velocidad en la velocidad de las ruedas.
+
 ```
 	<gazebo>
         <plugin filename="libignition-gazebo-sensors-system.so" name="ignition::gazebo::systems::Sensors">
@@ -844,8 +920,8 @@ Create a robot with 2 passive wheels and 2 active wheels.
     </gazebo>
 </robot>
 ```
-2) Create the launch file
-- Import the modules
+2) Vamos a crear un launch file
+- Importamos los modules
 ```
 from launch import LaunchDescription
 from launch_ros.actions import Node
@@ -859,7 +935,7 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
 ```
-- Create the _robot_description_ topic usin the _robot_state_publisher_
+- Creamos los _robot_description_ topic usand el paquete _robot_state_publisher_
 ```
     xacro_path = 'urdf/diff_drive.urdf.xacro'
     robot_description = PathJoinSubstitution([
@@ -877,7 +953,7 @@ def generate_launch_description():
         }]
     )
 ```
-- Spawn the robot
+- Spawn el robot
 ```
     spawn_node = Node(package='ros_gz_sim', executable='create',
                  arguments=[
@@ -892,7 +968,7 @@ def generate_launch_description():
                  output='screen')
 
 ```
-- Start Gazebo
+- Iniciamos Gazebo
 ```
     ignition_gazebo_node = IncludeLaunchDescription( PythonLaunchDescriptionSource(
                 [PathJoinSubstitution([FindPackageShare('ros_gz_sim'),
@@ -902,8 +978,8 @@ def generate_launch_description():
     
     
 ```
-- Create the bridge
--- In this case, the cmd_vel is a topic tha travels from ROS2 to Gazebo, we can use the ] symbol
+- Creamos el bridge
+  - En esto caso, el topic cmd_vel esta suscrito from ROS2 to Gazebo, podemos usar el ] symbol
 ```
     bridge = Node(
         package='ros_gz_bridge',
@@ -921,77 +997,78 @@ def generate_launch_description():
         bridge
     ])
 ```
-3) Modify the CMakeLists.txt file
+3) Modificar el file _CMakeLists.txt_
 ```
 install(DIRECTORY launch urdf DESTINATION share/${PROJECT_NAME})
 ```
-4) Compile the workspace and launch the simulation
+4) Compilamos la workspace y lainziamos la simulación
+
 
        $ colcon build --symlink-install
        $ source install/setup.bash
        $ ros2 launch diff_drive_description diff_drive.launch.py
-5) Use the rqt steering control to move the robot
+5) Vamos a usar el rqt steering control to actuate el robot
 
         $ rqt 
         
-## Example 6: Gazebo plugin
-In this example we will learn how to develop new plugins for Gazebo. Developing a plugin that will be added to the Gazebo world configuration, or directly to the robot model (as made with the the differential drive control plugin), allow you to directly access to the simulated model, creating fastest control algorithms. We will discuss 3 examples. One standalone plugin, to understand the structure of a plugin. One integrating ROS2 and Gazebo and finally, one more complex plugin to control the differential drive robot. 
+## Example 6: 
+## Gazebo plugin
+En este ejemplo vamos a desarrollar plugins personalizados para Gazebo. Desarrollar un plugin que se añadirà a la configuración del mundo de Gazebo o directamente al modelo del robot (como se hizo con el differential drive plugin).
 
-#### Basic plugin
-This is not a ROS2 package, so we can create manually the directory structure. 
+Un gazebo plugin permitirá de acceder directamente al modelo simulado y crear algoritmos de control más rápidos y performante. 
+Vamos a veer 3 ejemplos. 
+- Un plugin independiente para comprender la estructura de un plugin. 
+- Uno que integra ROS 2 y Gazebo 
+- Un plugin más complejo para controlar el robot con transmisión diferencial.
 
-1) Let's create the hello_world plugin in the ROS2 worksapce. 
+### Basic plugin
+Este no es un paquete ROS, entonces, tenemos que crear manualmente la estructura del paquete.
 
--- The main directory 
+1) Creemos el plugin _hello_world_ en el ROS workspace. 
+
  
         $ mkdir hello_world
-
--- The main source file
-
         $ touch HelloWorld.cpp
-        
--- The compilation file
-        
         $ touch CMakeLists.txt
-
--- The world including the plugin
-
         $ touch hello_world_plugin.sdf
 
-2) Fill the _HelloWorld.cpp_
-- We'll use a string and the ignmsg command below for a brief example.
+2) Editamos el _HelloWorld.cpp_
+
+- En esto ejemplo vamos a escribir un mensaje su la console de Gazebo.
+
 ```
 #include <string>
 #include <gz/common/Console.hh>
 ```
-- This header is required to register plugins, to be discovered to the Gazebo system
+- Vamos a incluir un header para registrar el plugin en el grupo del plugin utilizable por Gazebzo.
 ```
 #include <gz/plugin/Register.hh>
 ```
-- The System header is integrated to interface with the Gazebo system
+- El header por conectar el código con el sistema Gazebo
 ```
 #include <gz/sim/System.hh>
 ```
-- It's good practice to use a custom namespace for your project.
+- Vamos a definir un namespace
 ```
 namespace hello_world
 {
 ```
-- This is the main plugin's class. It must inherit from System and at least one other interface. Here we use `ISystemPostUpdate`, which is used to get results after physics runs. 
+- Esta es la clase principal del plugin. Debe heredar de System y al menos otra interfaz. Aquí usamos `ISystemPostUpdate`, que se utiliza para obtener resultados después la iteracion del simulator.
  ```
   class HelloWorld:
     public gz::sim::System,
     public gz::sim::ISystemPostUpdate
   {
 ```
-- Plugins inheriting ISystemPostUpdate must implement the PostUpdate callback. This is called at every simulation iteration after the physics updates the world. The _info variable provides information such as time, while the _ecm provides an interface to all entities and components in simulation
+- Los plugins que heredan ISystemPostUpdate deben implementar la llamada PostUpdate. Esta se llama en cada iteración de simulación después de que la física actualiza el mundo. 
+- La variable _info proporciona información como la hora, mientras que _ecm proporciona una interfaz para todas las entidades y componentes de la simulación.
 ```
     public: void PostUpdate(const gz::sim::UpdateInfo &_info,
                 const gz::sim::EntityComponentManager &_ecm) override;
   };
 }
 ```
-- This is required to register the plugin. Make sure the interfaces match what's in the header.
+- Esto es necesario para registrar el plugin.
 ```
 IGNITION_ADD_PLUGIN(
     hello_world::HelloWorld,
@@ -1000,13 +1077,13 @@ IGNITION_ADD_PLUGIN(
 
 using namespace hello_world;
 ```
-- Here we implement the PostUpdate function, which is called at every iteration.
+- Vamos a implementar el PostUpdate function, que se llama en cada iteración.
 ```
 void HelloWorld::PostUpdate(const gz::sim::UpdateInfo &_info,
     const gz::sim::EntityComponentManager &/*_ecm*/)
 {
 ```
-- This is a simple example of how to get information from UpdateInfo. Based on the status of the simulation (paused or not), we write a message on the terminal about the status. 
+- Este es un ejemplo sencillo de cómo obtener información de UpdateInfo. En función del estado de la simulación (en pausa o no), escribimos un mensaje en la terminal sobre el estado.
 ```
   std::string msg = "Hello, world! Simulation is ";
   if (!_info.paused)
@@ -1015,20 +1092,20 @@ void HelloWorld::PostUpdate(const gz::sim::UpdateInfo &_info,
   ignmsg << msg << std::endl;
 }
 ```
-3) Fill the CMakeLists.txt file, to directly compile the plugin
+3) Vamos a editar el _CMakeLists.txt_ para compilar el plugin
 ```
 cmake_minimum_required(VERSION 3.10.2 FATAL_ERROR)
 find_package(ignition-cmake2 REQUIRED)
 project(Hello_world)
 ```
-- We must find the compilation libraries and objects of the Gazebo toolkit. We can do this with the _ign_find_package_ keyword.
+-  Debemos encontrar las librerías de compilación y los objetos del kit de compilacion de  Gazebo. Podemos hacerlo con la palabra clave _ign_find_package_.
 ```
 ign_find_package(ignition-plugin1 REQUIRED COMPONENTS register)
 set(IGN_PLUGIN_VER ${ignition-plugin1_VERSION_MAJOR})
 ign_find_package(ignition-gazebo6 REQUIRED)
 set(IGN_GAZEBO_VER ${ignition-gazebo6_VERSION_MAJOR})
 ```
-- A plugin is a library (it has not a main function). 
+- Un plugin es una shared library (falta la main function). 
 ```
 add_library(HelloWorld SHARED HelloWorld.cpp)
 set_property(TARGET HelloWorld PROPERTY CXX_STANDARD 17)
@@ -1036,14 +1113,14 @@ target_link_libraries(HelloWorld
   PRIVATE ignition-plugin${IGN_PLUGIN_VER}::ignition-plugin${IGN_PLUGIN_VER}
   PRIVATE ignition-gazebo${IGN_GAZEBO_VER}::ignition-gazebo${IGN_GAZEBO_VER})
 ```
-4) Create an SDF file to include the plugin. 
+4) Vamos a crear el SDF file para incluir el plugin. 
 ```
 <?xml version="1.0" ?>
 <sdf version="1.6">
   <world name="default">
 ```
-- Plugin filename: the one included in the CMakeLists.txt
-- Plugin name: the class specified in the source file
+- Plugin filename: Eso utilisado en el CMakeLists.txt para compilar la shared library
+- Plugin name: Eso utiliado en le source file 
 ```
     <plugin filename="HelloWorld" name="hello_world::HelloWorld">
     </plugin>
@@ -1059,26 +1136,29 @@ $ cmake ..
 $ make
 $ cd ..
 ```  
-6) Discover the plugin. This is made by setting the _GZ_SIM_SYSTEM_PLUGIN_PATH_ environment variable. This kinds of variable live only in the space where they are assigned. So we should export this variable in every terminal where the sdf world file is executed. Later we will see how to automatize this step
+6) Descubrir el plugin. Esto se hace configurando la environment variable  _GZ_SIM_SYSTEM_PLUGIN_PATH_. Recuerda: este tipo de variables solo viven en el espacio donde están asignadas. Por lo tanto, deberíamos exportar esta variable en cada terminal donde se ejecute el archivo sdf world. Más adelante veremos cómo automatizar este paso.
+
 ```
 $ export GZ_SIM_SYSTEM_PLUGIN_PATH=`pwd`/build
 ``` 
-7) Start the simulation. We must specify the sdf file, and the verbosity level. To print out data on terminal, the lowest verbosity level is 3.
+7) Iniciamos la simulación. Debemos especificar el archivo sdf y el nivel de verbosidad. Para imprimir los datos en la terminal, el nivel de verbosidad más bajo es 3.
 ``` 
 $ ign gazebo -v 3 hello_world_plugin.sdf
 ``` 
-Now you can check the terminal, how the message changes based on the start/stop status of the simulation. 
+- Ahora puedes comprobar en la terminal cómo cambia el mensaje en función del estado de inicio o detención de la simulación.
 
-8) Avoid to create problems to the colcon compilation system. Now the _hello_world_ directory is in our ROS 2 software pool. This means that colcon will try to compile it. But this is not a ROS 2 package, so it will return an error. To avoid the compilation of this directory, create in its root an empty file called: COLCON_IGNORE
+8) Evite usar colcon con esto plugin
 
-#### Gazebo Plugin <-> ROS 2 integration
-Let's slightly modify the latter example to publish the status of the simulation not on the terminal but on a ROS 2 topic. In addition, we will use a launch file to start the simualtion.
+- Ahora el directorio _hello_world_ está en nuestro pool de software de ROS 2. Esto significa que colcon intentará compilarlo. Pero no es un paquete de ROS 2, por lo que devolverá un error. Para evitar la compilación de este directorio, vamos a crear un archivo llamado COLCON_IGNORE en esto directorio
 
-1) Create a ROS 2 package 
+### Gazebo Plugin <-> ROS 2 integration
+Modifiquemos ligeramente el último ejemplo para publicar el estado de la simulación no en el terminal sino en un tema de ROS 2. Además, utilizaremos un archivo de inicio para iniciar la simulación.
+
+1) Vamos a crear un nuevo paquete 
 ``` 
 $ ros2 pkg create hello_world_ros rclcpp std_msgs 
 ``` 
-2) Create the needed directories 
+
 ``` 
 $ cd hello_world_ros
 $ mkdir launch
@@ -1088,8 +1168,9 @@ $ touch world/hello_world_ros_plugin.sdf
 $ touch src/hello_world_ros.cpp
 ``` 
 
-3) Fill the source code. This will be very similar to the previous one, let's highlight the difference with respect to the previous one.
--- Include the ROS 2 headers
+3) Vamos a rellenar el código, este será muy similar al primero ejemplo. Vamos a resaltar la diferencia entre los dos.
+
+  - ROS2 headers
 ``` 
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
@@ -1103,7 +1184,7 @@ namespace hello_world {
    class HelloWorldROS:
     public gz::sim::System,
 ```
--- In addition to the PostUpdate function, we will implement the Configure function. This is used to configure the environment of the plugin.
+  - Vamso a añadir el methodo: Configure para initializar el plugin.
 ```
     public gz::sim::ISystemConfigure,
     public gz::sim::ISystemPostUpdate {
@@ -1115,7 +1196,8 @@ namespace hello_world {
                             gz::sim::EntityComponentManager &_ecm,
                             gz::sim::EventManager &_eventMgr) final;
 ```
--- Declare a pointer to the ROS 2 node. We will fill this object with the memory address of a ROS 2 node initialized object. Then we will create the publisher object.
+-- Declaramos un puntero al nodo ROS 2. Initializiamo esto ne la configuracion. 
+
 ```
     private: rclcpp::Node::SharedPtr _ros_node; 
     private: rclcpp::Publisher<std_msgs::msg::String>::SharedPtr _publisher;
@@ -1129,7 +1211,7 @@ IGNITION_ADD_PLUGIN(
 
 using namespace hello_world;
 ```
--- Another function from the Gazebo tools is used the Configure function. This function is called when the plugin is loaded. Differently from the PostUpdate, called every time that the simulation iterates, the configure function is called just once.
+
 ```
 void HelloWorldROS::Configure(const gz::sim::Entity &_entity,
     
@@ -1137,7 +1219,7 @@ void HelloWorldROS::Configure(const gz::sim::Entity &_entity,
     gz::sim::EntityComponentManager &/*_ecm*/,
     gz::sim::EventManager &/*_eventMgr*/) {
 ```
--- In this function, we initialize the ROS 2 node without any argument (we don't have argc and argv)
+  - En esta función, inicializamos el nodo ROS 2 sin ningún argumento (no tenemos argc ni argv)
 ```
     rclcpp::init(0, nullptr);
     _ros_node = rclcpp::Node::make_shared("hello_world_ros_plugin");
@@ -1151,14 +1233,15 @@ void HelloWorldROS::PostUpdate(const gz::sim::UpdateInfo &_info, const gz::sim::
         msg += "not ";
     msg += "paused.";
 ```
--- The ROS 2 string message is initialized, filled and published.
+  - Al final, el mensaje de  ROS 2 se inicializa, se completa y se publica.
+
 ```
     auto message = std_msgs::msg::String();
     message.data = msg;
     _publisher->publish( message );
 }
 ```
-4) Fill the CMakeLists.txt. Starting from the one auto-generated from the ROS2 pkg create command, we must fuse the compilation instruction used from the Gazebo compilation. 
+4) Complete el archivo CMakeLists.txt. A partir del archivo generado automáticamente, debemos fusionar la instrucción de compilación utilizada en la compilación de Gazebo.
 
 ```
 cmake_minimum_required(VERSION 3.8)
@@ -1173,7 +1256,7 @@ find_package(ament_cmake REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 ```
-- We must add the ignition-cmake2 package and the other components, we can copy and past these from the previous example
+- Debemos agregar el paquete ignition-cmake2. Podemos copiarlos y pegarlos del ejemplo anterior
 ```
 find_package(ignition-cmake2 REQUIRED)
 ign_find_package(ignition-plugin1 REQUIRED COMPONENTS register)
@@ -1181,7 +1264,8 @@ set(IGN_PLUGIN_VER ${ignition-plugin1_VERSION_MAJOR})
 ign_find_package(ignition-gazebo6 REQUIRED)
 set(IGN_GAZEBO_VER ${ignition-gazebo6_VERSION_MAJOR})
 ```
-- We don't need an executable, but a library. Add this library, then, add to it the additional exteranl libraries
+- No necesitamos un ejecutable. Diferentemente, creamos una library y luego, añadimos les dependencias.
+
 ```
 add_library(HelloWorldROS SHARED src/hello_world_ros.cpp)
 target_link_libraries(HelloWorldROS 
@@ -1189,11 +1273,10 @@ target_link_libraries(HelloWorldROS
   ignition-gazebo${IGN_GAZEBO_VER}::ignition-gazebo${IGN_GAZEBO_VER}
 )
 ```
-- And add the ROS 2 dependencies (thanks to the ament compilation system)
 ```
 ament_target_dependencies(HelloWorldROS rclcpp std_msgs)
 ```
-- Install the directories used in the launch process
+- Vamos a instalar los directorios utilizados en el proceso de lanzamiento del plugin
 ```
 install(DIRECTORY launch world DESTINATION share/${PROJECT_NAME})
 ```
@@ -1212,7 +1295,8 @@ endif()
 
 ament_package()
 ```
-5) Fill the sdf world file. This is exactly the same of the previous example, we must just change the plugin.
+5) Vamos a Rellenar el archivo de el world. Es exactamente lo mismo que el ejemplo anterior, solo debemos cambiar el complementplugino.
+
 ```
 <?xml version="1.0" ?>
 <sdf version="1.6">
@@ -1222,7 +1306,7 @@ ament_package()
   </world>
 </sdf>
 ```
-6) Fill the launch file. Here we start the world but also set the environment. 
+6) Editamos el launch file para iniciar el mundo e inicializar las variables de ambiente.
 ```
 import os
 from launch import LaunchDescription
@@ -1235,7 +1319,6 @@ from launch.substitutions import PathJoinSubstitution
 def generate_launch_description():
     ld = LaunchDescription()
 ```
--- We want to start with the sdf file defined above. We find the path of the shared package, setting the _hello_world_ros_plugin.sdf_. This path is used in the input arguments of the gazebo launch file. 
 ```
     sdf_file_path = os.path.join(
         FindPackageShare('hello_world_ros').find('hello_world_ros'),
@@ -1256,14 +1339,13 @@ def generate_launch_description():
     )
 
 ```
--- What misses...? The export of the plugin path. We can directly do it in the launch file. In this way, we can avoid to link our plugin to specific system configurations. Let's retrieve the build directory of the ROS 2 workspace and the _hello_world_ros_ subfolder. 
+  - ¿Qué falta? La exportación de la ruta del plugin. Esto podemos hacerlo directamente en el launch file. De esta forma, podemos evitar vincular nuestro plugin a configuraciones específicas del sistema. Recuperemos el directorio de compilación del workspace de ROS 2 y la subcarpeta _hello_world_ros_.
+
 ```
     workspace_dir = os.getenv("ROS_WORKSPACE", default=os.getcwd())
     plugin_dir = os.path.join(workspace_dir, "build/hello_world_ros")    
 ```
--- The _SetEnvironmentVariable_ function can be used for this scope. Remember to add the element we are creating with this function in the action list of the LaunchDescription. 
 ```
-
     ign_resource_path = SetEnvironmentVariable(
         name='GZ_SIM_SYSTEM_PLUGIN_PATH',
         value=[plugin_dir]
@@ -1274,35 +1356,38 @@ def generate_launch_description():
 
     return ld
 ``` 
-7) Compile the workspace and launch the node
+7) Compilamos y empeziamos el plugin
 ``` 
 $ colcon build --symlink-install
 $ source install/setup.bash
 $ ros2 launch hello_world_ros hello_world_ros.launch.py
 $ ros2 topic echo /topic
 ``` 
-__Be Careful__: if the system doesn't find the proper plugin, it will start the simulation anyway. No error are returned but of course, the system will not work as expected. 
+__Be Careful__: Si el sistema no encuentra el plugin, iniciará la simulación de todos modos. No se devuelve ningún error, pero, por supuesto, el sistema no funcionará como se espera.
 
 ### Publish on Gazebo topic
-This last example still integrates ROS 2 and Gazebo, by controlling the differential drive robot by directly publishing on the Gazebo topic inside the plugin implementation. We will reproduce the behaviour of the ROS 2 bridge (it is just an example). The flow is:
--- Publish on a ROS 2 Topic called _cmd_vel_from_ros_
--- The _cmd_vel_from_ros_ is read from the Gazebo plugin
--- The data on the topic is managed and published on the Gazboe /cmd_vel topic
+Este último ejemplo aún integra ROS 2 y Gazebo para controlar el robot differencial mediante la publicación directa en el tema Gazebo dentro de la implementación del complemento. Reproduciremos el comportamiento del bridge ROS 2 (es solo un ejemplo). 
 
-__Note__: we will add this plugin to a robot model. Let's add the urdf robot model of the differential drive robot here. 
+El flujo es:
+  - Publicar en un topic ROS 2 llamado _cmd_vel_from_ros_
+  - El _cmd_vel_from_ros_ se lee adentro el plugin Gazebo
+  - Los datos del topic se modifica un pochito y se publican en el topic Gazboe /cmd_vel
 
-1) Create the package
+
+__Note__: Agregaremos esto plugin al model del robot en el urdf
+
+1) Vamos a crear el paquete
 ``` 
 $ ros2 pkg create cmd_vel_plugin rclcpp std_msgs geometry_msgs 
 ``` 
-2) Let's create the structure
 ``` 
 $ cp -r diff_drive_description/urdf/ cmd_vel_plugin/
 $ mkdir launch
 $ touch src/pub_vel_cmd.cpp
 ``` 
-3) Fill the source
--- As you can guess, the source is quite similar to the previous one, let's discuss the main differences
+3) Vamos a editar el codigo
+
+- El codigo es bastantemente similar al codigo del ejemplo anterior
 ``` 
 #include "rclcpp/rclcpp.hpp"
 #include <gz/sim/System.hh>
@@ -1310,12 +1395,10 @@ $ touch src/pub_vel_cmd.cpp
 #include <gz/plugin/Register.hh>
 #include <sdf/sdf.hh>
 ``` 
--- The Node header and the twist version of Gazebo are used to publish data
 ``` 
 #include <gz/transport/Node.hh>
 #include <geometry_msgs/msg/twist.hpp>
 ``` 
--- Let's define the namespace
 ``` 
 namespace cmd_vel_plugin {
    class PubCmdVel:
@@ -1330,7 +1413,6 @@ namespace cmd_vel_plugin {
                             gz::sim::EntityComponentManager &_ecm,
                             gz::sim::EventManager &_eventMgr) final;
 ``` 
--- Define the callback of the velocity message
 ``` 
     public: void cmd_vel_cb( const geometry_msgs::msg::Twist );
 ``` 
@@ -1338,13 +1420,11 @@ namespace cmd_vel_plugin {
     private: rclcpp::Node::SharedPtr _ros_node; 
     private: rclcpp::Publisher<std_msgs::msg::String>::SharedPtr _publisher;
 ``` 
--- Define the subscriber 
 ```
 
     private: rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr _subscriber;
     private: gz::transport::Node::Publisher _gz_cmdVelPub;
 ``` 
--- Define the Gazebo node object and the twist message (still gazebo side) 
 ```
     private: gz::transport::Node _gz_node;
     private: gz::msgs::Twist _cmdVelMsg;
@@ -1360,7 +1440,8 @@ IGNITION_ADD_PLUGIN(
 
 using namespace cmd_vel_plugin;
 ``` 
--- In the callback of the velocity message, published in the ROS 2 network, we saturate the linear and angular velocities to 0.2 and 0.5.
+- En la callback de el mensaje en la red ROS 2 saturamos las velocidades lineales y angulares a 0.2 y 0.5.
+
 ```
 void PubCmdVel::cmd_vel_cb( const geometry_msgs::msg::Twist t) {
     double vx = (t.linear.x < 0.2) ? t.linear.x : 0.2; 
@@ -1377,20 +1458,20 @@ void PubCmdVel::Configure(const gz::sim::Entity &_entity,
     rclcpp::init(0, nullptr);
     _ros_node = rclcpp::Node::make_shared("cmd_vel_plugin");
 ``` 
--- Create the subscriber to the ROS 2 message and the publisher to the /cmd_vel Gazebo topic
 ```
     _subscriber = _ros_node->create_subscription<geometry_msgs::msg::Twist>("/cmd_vel_from_ros", 10, std::bind(&PubCmdVel::cmd_vel_cb, this, std::placeholders::_1));
     _gz_cmdVelPub = _gz_node.Advertise<gz::msgs::Twist>("/cmd_vel");
 }
 ``` 
--- In the Update function, publish the message. We also have to call the spin function: the spin function allow the callbacks to work properly. We can use the sping_some on the ROS 2 node to avoid the blocking behaviour of the spin.
+- En la función Update, publicamos el mensaje. También tenemos que llamar a la función spin: 
+  - __Recuerda__: la función spin permite que las callbacks funcionen correctamente. Podemos usar spin_some en el nodo ROS 2 para evitar el comportamiento de bloqueo del spin.
 ```
 void PubCmdVel::PostUpdate(const gz::sim::UpdateInfo &_info, const gz::sim::EntityComponentManager &/*_ecm*/) {    
     rclcpp::spin_some( _ros_node );
     _gz_cmdVelPub.Publish(_cmdVelMsg);
 }
 ``` 
-4) Modify the _CMakeLists.txt_. 
+4) Editamos el _CMakeLists.txt_. 
 ``` 
 cmake_minimum_required(VERSION 3.8)
 project(cmd_vel_plugin)
@@ -1412,7 +1493,7 @@ set(IGN_PLUGIN_VER ${ignition-plugin1_VERSION_MAJOR})
 ign_find_package(ignition-gazebo6 REQUIRED)
 set(IGN_GAZEBO_VER ${ignition-gazebo6_VERSION_MAJOR})
 ``` 
--- We call the plugin CmdVelPlugin
+  - aqui llamamos el plugin CmdVelPlugin
 ``` 
 add_library(CmdVelPlugin SHARED src/pub_cmd_vel.cpp)
 
@@ -1438,7 +1519,7 @@ endif()
 
 ament_package()
 ``` 
-5) Add the plugin to the robot _xacro_
+5) Añadimos el plugin al robot _xacro_
 ``` 
 <gazebo>
         <plugin filename="libignition-gazebo-diff-drive-system.so" name="ignition::gazebo::systems::DiffDrive">
@@ -1454,13 +1535,13 @@ ament_package()
             <render_engine>ogre2</render_engine>
         </plugin>
 ``` 
--- We call the plugin CmdVelPlugin, the class is _cmd_vel_plugin::PubCmdVel_
+  - El nombre del plugin es el del CMakelists, la classe es _cmd_vel_plugin::PubCmdVel_
 ``` 
         <plugin filename="CmdVelPlugin" name="cmd_vel_plugin::PubCmdVel">
         </plugin>
     </gazebo>
 ``` 
-6) Edit the launch file.
+6) Vamos a crear el launch file
 ``` 
 import os
 from launch import LaunchDescription
@@ -1525,7 +1606,6 @@ def generate_launch_description():
     )
 
 ``` 
--- The main difference except for the robot model, is the initialization of the environment variable.
 ``` 
     workspace_dir = os.getenv("ROS_WORKSPACE", default=os.getcwd())
     plugin_dir = os.path.join(workspace_dir, "build/cmd_vel_plugin")    
@@ -1536,7 +1616,7 @@ def generate_launch_description():
     )
     
 ``` 
--- In the bridge, we don't need anymore the cmd_vel republish topic.
+  - En el bridge, podemos evitar agregar el topic cmd_vel
 ``` 
     bridge = Node(
         package='ros_gz_bridge',
@@ -1557,25 +1637,28 @@ def generate_launch_description():
     ])
 ``` 
 
-7) Compile and test the plugin
+7) Vamos a compilar
 ``` 
 $ colcon build --symlink-install
 $ source install/setup.bash
 $ ros2 launch cmd_vel_plugin cmd_vel_plugin.launch.py
 ```
--- Publish the cmd vel from rqt
+  - Vamos a usar rqt para publicar el cmd_vel topic
 ```
 $ rqt 
 ```
 
-## Part 2: ros2_control and Gazebo
+## Part 2: 
+## ros2_control and Gazebo
 
-In this part of the tutorial, we will discuss of the ros2_control framework with two macro-examples. 
-- Integration of the default controllers to control a robotic arm
-- Development of a custom controller using the ros2_control framework
+En esta parte del tutorial, analizaremos el framework ros2_control con dos ejemplos.
+- Integración de controladores predeterminados para controlar un brazo robótico
+- Desarrollo de un controlador personalizado utilizando ros2_control
 
-Before to start we need a robot to test the controllers. We will implement a 2 Degrees of Freedom (DOF) robot model for this. Let start to create the structure, without the controllers. 
-1) Create the ROS 2 package.
+
+Antes de comenzar, necesitamos un robot para probar los controladores. Para ello, implementaremos un modelo de robot de 2 grados de libertad (DOF). Comencemos a crear la estructura, sin los controladores.
+
+1) Vamos a crear el ROS 2 package.
 ```
 $ ros2 pkg create pendulum_description --dependencies xacro
 $ cd pendulum_description
@@ -1584,7 +1667,7 @@ $ mkdir launch
 $ touch urdf/pendulum_robot.xacro
 $ touch urdf/pendulum_no_controllers.launch.py
 ```
-2) Write the robot model file _pendulum_robot.xacro_
+2) Vamos a editar el modelo del robot: _pendulum_robot.xacro_
 
 ```
 <?xml version="1.0"?>
@@ -1685,7 +1768,7 @@ $ touch urdf/pendulum_no_controllers.launch.py
   </joint>
 </robot>
 ```
-3) Create the launch file (nothing of new here!)
+3) Vamos a crear el launch file (¡Nada de nuevo aquí!)
 ```
 import os
 from ament_index_python.packages import get_package_share_directory
@@ -1745,7 +1828,7 @@ def generate_launch_description():
 
     return ld
 ```
-4) Modify the _CMakeLists.txt_
+4) Vamos a editar el _CMakeLists.txt_
 ```
 install(DIRECTORY urdf
   DESTINATION share/${PROJECT_NAME}
@@ -1754,22 +1837,32 @@ install(DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}
 )
 ```
-4) Compile and start the simulation
+4) Compilamos el workspace y ejecutamos el launch file
 ```
 $ colcon build --symlink-install
 $ source install/setup.bash
 $ ros2 launch pendulum_description pendulum_no_controllers.launch.py
 ```
 
-As you can see, the robot falls under the effect of the dynamics factors, like the gravity. Why? 
+Como se puede observar, el robot cayendo. ¿Por qué?
+
+- Porque no tiene controladores!
 
 #### Add position and state controllers to the robot
-To allow the robot control we must add controllers. The main control interface is the position control, that allow us to specify the position of the joint. The controller will apply its best effort to reache the desired position. Another common interface is the velocity, where the setpoint is specified as a desired velocity command. 
+- Para permitir el control del robot debemos agregar controladores. La interfaz de control principal es el control de posición, que permite nos especificar la posición de los motores de el robot. 
 
-To add the controllers follow these steps
+- El controlador aplicará su mejor esfuerzo para alcanzar la posición deseada. 
 
-1) Add the ros2_control tag to the xacro file. This tag is used to specify hardware interface and the joints involved in the control along with the interfaced used to control or read its state.  
-Let's start from the previous xacro file, creating a new one called: _pendulum_robot_with_controllers.xacro_
+- Otra interfaz para controlar los motores son el de velocidad y la fuerza
+
+Para agregar las controladoras sigue estos pasos.
+
+1) Agregue el tag ros2_control al archivo xacro. 
+
+- Esto tag se utiliza para especificar la interfaz de hardware y los juntos da controlar con la interfaz utilizada para el controlo.
+
+- Comencemos desde el archivo xacro anterior, creando uno nuevo llamado: _pendulum_robot_with_controllers.xacro_
+
 ```
 <?xml version="1.0"?>
 
@@ -1878,23 +1971,28 @@ Let's start from the previous xacro file, creating a new one called: _pendulum_r
   </joint>
 </robot>
 ```
-- Add the ros2_control tag to the xacro file. 
+- Agreguamos el ros2_control tag 
+. 
 ```
 <ros2_control name="IgnitionSystem" type="system">
 ```
-- The hardware is the interface of the ignition to ROS2 control. We cannot chose a different controller
+- El hardware es la interfaz de ignition con ros2_control. No podemos elegir un controlador diferente
+
 ```
 <hardware>
   <plugin>ign_ros2_control/IgnitionSystem</plugin>
 </hardware>
 ```
-- We have only 1 Joint the _revolute_joint_. Let's add to it two control interfaces: position and velocity. 
+- Solo tenemos un joint, el _revolute_joint_. Vamos a agregarle dos interfaces de control: posición y velocidad.
+
 ```
 <joint name="revolute_joint">
   <command_interface name="position" />
   <command_interface name="velocity" />
 ```
-- Similarly, we add a state inteface (to publish the well-known _/joint_state_ topic). In this case, we ask for the position and the velocity of the joint. In the position interface section, we can specify the initial position of the joint. In this case -1 rad. 
+- De manera similar, agregamos una interfaz de estado (para publicar el topic _/joint_state_). 
+- En este caso, solicitamos la posición y la velocidad de la articulación. 
+- Ademas, en la sección de interfaz de posición, podemos especificar la posición inicial de la articulación. En este caso, -1 rad.
 ```
   <state_interface name="position">
     <param name="initial_value">-1.0</param>
@@ -1903,50 +2001,54 @@ Let's start from the previous xacro file, creating a new one called: _pendulum_r
 </joint>
 </ros2_control>
 ```
-2) Add the ros2_control plugin
+2) Agregue el plugin ros2_control
+
 ```
 <gazebo>
 ```
-- The filename and the name of the plugin are these for Fortress, for Jazzy this plugin changes its name. 
+- El nombre del archivo y el nombre del complemento son estos para Fortress, para Jazzy este complemento cambia su nombre.
+ 
 ```
     <plugin filename="ign_ros2_control-system" name="ign_ros2_control::IgnitionROS2ControlPlugin">
 ```
-- Each controller included here must be configured. To configure it, we use the classical yaml file. 
+- Cada controlador incluido aquí debe configurarse. Para configurarlo, utilizamos el archivo yaml clásico.
 ```    
         <parameters>$(find pendulum_description)/config/pendulum_controller.yaml</parameters>
     </plugin>
 </gazebo>
 ```
-3) Edit the yaml configuration file. Create a config directory in the _pendulum_description_ package. 
+3) Edite el archivo de configuración yaml.
+- Cree un directorio de configuración en el paquete _pendulum_description_.
+
 ```
 $ cd src/pendulum_description
 $ mkdir config
 $ touch config/pendulum_controller.yaml
 ```
-- Here is the content. It is like a classical yaml used to store the parameters of a node. 
+- Aquí está el contenido de el yaml. Es como un yaml clásico que se utiliza para almacenar los parámetros de un nodo.
+
 ```
 controller_manager:
   ros__parameters:
     update_rate: 100  
 ```
-- A controller has a name. In this case we called it position_control. The name is used later to specify additional paremeters for the controller. The type of this controller is _forward_command_controller/ForwardCommandController_. This controller just forward the input data to the robotic joint.
+- Un controlador tiene un nombre. En este caso, lo llamamos position_control. El nombre se utiliza más adelante para especificar parámetros adicionales para el controlador. 
+- El tipo de este controlador es _forward_command_controller/ForwardCommandController_. Este controlador simplemente envía los datos de entrada a el motor.
 ```
     position_control:
       type: forward_command_controller/ForwardCommandController
 ```
-- We do the same for the _velocity_control_. 
+- Hacemos lo mosimo para el _velocity_control_. 
 ```
     velocity_control:
       type: forward_command_controller/ForwardCommandController
 ```
-- We add also the joint_state_broadcaster, needed to publish the /joint_states. This controller doesn't needs for additional configurations, since it streams the data for all the joints of the robot.
+- También añadimos el _joint_state_broadcaster_, necesario para publicar el _/joint_states_. Este controlador no necesita configuraciones adicionales, ya que transmite los datos de todas las articulaciones del robot.
 ```
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 ```
--  Now, it is possible to configure the controllers. For each of them we must define:
--- The joints involved in the control process
--- The input interface (position/velocity/effort)
+- Ahora es posible configurar los controladores. Para cada uno de ellos debemos definir los juntos que intervienen en el proceso de control (position/velocity/effort)
 ```
 position_control:
   ros__parameters:
@@ -1961,7 +2063,7 @@ velocity_control:
     interface_name: velocity
  
 ```
-4) Define the launch file. To spawn the new robot and load the controllers: _pendulum_controller.launch.py_.
+4) Creamos el launch file para cargar los controles
 ```
 from launch import LaunchDescription
 from launch.actions import ExecuteProcess, IncludeLaunchDescription
@@ -1977,7 +2079,6 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
 ```
-- Load the new robot model, the one the controllers
 ```
     xacro_path = 'urdf/pendulum_robot_with_controllers.xacro'
 
@@ -2004,8 +2105,9 @@ def generate_launch_description():
                    '-name', 'cart', '-allow_renaming', 'true'],
     )
 ```
-- Each controller must be loaded and activated to have an effect on the joint. We can do this using the command line after loaded the robot model. At the same time we can do it in the launch file. 
--- To load the controller, we use the ExecuteProcess function in the launch file. Here we execute the following command:
+- Cada controlador debe estar cargado y activado para que tenga efecto sobre el motor. 
+  - Podemos hacer esto mediante la línea de comandos luego de cargar el modelo del robot. Al mismo tiempo podemos hacerlo en el launch file.
+  - Para cargar el controlador, utilizamos la función _ExecuteProcess_ en el archivo de lanzamiento. Aquí ejecutamos el siguiente comando:
         
         $ ros2 control load_controller --set-state active joint_state_broadcaster 
 ```
@@ -2022,7 +2124,7 @@ def generate_launch_description():
     )
 
 ```
-- We load, in an inactive state the velocity controllers, since we activated the position one 
+- Cargamos, en estado inactivo los controladores de velocidad, ya que activamos el de posición. 
 ```
     load_velocity_controller = ExecuteProcess(
         cmd=['ros2', 'control', 'load_controller', '--set-state', 'inactive',
@@ -2037,60 +2139,39 @@ def generate_launch_description():
                                        'launch',
                                        'gz_sim.launch.py'])]),
             launch_arguments=[('gz_args', [' -r -v 4 empty.sdf'])]),
-        RegisterEventHandler(
-            event_handler=OnProcessExit(
-                target_action=gz_spawn_entity,
-                on_exit=[load_joint_state_broadcaster],
-            )
-        ),
-```
-- The operations made on the controllers are executed at the end of the launch file using the _OnProcessExit_ function. This means that it is executed when the other nodes exist in the ROS 2 system.
-```
-        
-        RegisterEventHandler(
-            event_handler=OnProcessExit(
-                target_action=load_joint_state_broadcaster,
-                on_exit=[load_position_controller],
-            )
-        ),
-        
-        RegisterEventHandler(
-            event_handler=OnProcessExit(
-                target_action=load_joint_state_broadcaster,
-                on_exit=[load_velocity_controller],
-            )
-        ),
+ 
         node_robot_state_publisher,
         gz_spawn_entity,
+        load_joint_state_broadcaster,
+        load_position_controller,
+        load_velocity_controller
     ])
 ```
-5) Change the CMakeLists.txt
-- Add the installation of the config directory
+5) Vamos a editar el _CMakeLists.txt_
 ```
 install(DIRECTORY config
   DESTINATION share/${PROJECT_NAME}
 )
 ```
-6) Launch the simulation
-- Compile and source the workspace
+6) Empeziamos la simulacion
 ```
 $ colcon build --symlink-install
 $ source install/setup.bash
 $ ros2 launch pendulum_description pendulum_controller.launch.py
 ```
-- Check the active topics
+- Listmao los topics
 ```
 $ ros2 topic list
     /joint_states
     /position_control/commands
     /velocity_control/commands
 ```
-- Control the actuator, publishing a position command
+- Controlamos los motore
 ```
 $ ros2 topic pub /posion_control/commands std_msgs/msg/Float64MultiArray "{data: [3]}"
 ```
 
-7) Interact with the controller manager
+7) Interactuar con el controller manager
 
 ```
 $ ros2 control list_controllers
@@ -2101,19 +2182,20 @@ $ ros2 control list_hardware_interfaces
         list_hardware_interfaces -> Output the list of available command and state interfaces
 
 ```
-
-8) Change the active controller
-
+8) Cambiar el controlador activo
 ```
 $ ros2 control switch_controllers --activate velocity_control --deactivate position_control
 $ ros2 control list_controllers
 $ ros2 topic pub /veloty_control/commands std_msgs/msg/Float64MultiArray "{data: [2]}"
 ```
 
-#### Develop a custom controller
-Sometimes it is useful to create custom controller to perform specific actions. Define a specific controller is useful when we want to install routines directly inside the controller. This improve the performance of the controller. Let's create a controller that controls the angular commands of the _revolute_joint_ following a sinusoidal motion.
+### Develop a custom controller
+A veces resulta útil crear un controlador personalizado para realizar acciones específicas. Definir un controlador específico resulta útil cuando queremos instalar rutinas directamente dentro del controlador. Esto mejora el rendimiento del controlador. Vamos a crear un controlador que controle los comandos angulares de el junto _revolute_joint_ siguiendo un movimiento sinusoidal.
 
-1) Create the controller package
+- El perfil de los movimientos sinusoidales se especifica a través de un tema, utilizando un vector
+
+
+1) Vamos a crear el controller package
 
 ```
 $ ros2 pkg create sine_ctrl --dependencies rclcpp std_msgs controller_interface pluginlib
@@ -2122,8 +2204,8 @@ $ touch sine_controller.xml
 $ src/sine_ctrl.cpp
 ```
 
-2) Create the controller source
-- At start, we include the header files to use the ROS2 function, access to the controller interface and handle Flota32MultiArray data
+2) Creamos la fuente del controlador
+- Al inicio, incluimos los headers para usar la función ROS2, acceder a la interfaz del controlador y manejar los datos de Flota32MultiArray
 ```
 #include "rclcpp/rclcpp.hpp"
 #include "controller_interface/controller_interface.hpp"
@@ -2131,29 +2213,30 @@ $ src/sine_ctrl.cpp
 #include "std_msgs/msg/float32_multi_array.hpp"
 
 using namespace std;
-
-- The controller must be implemented inside a namespace. Inside the namespace, we must define the controller class that inherits from the base class controller_interface::ControllerInterface:
-
+```
+- El controlador debe estar implementado dentro de un namespace. Dentro del espacio de nombres, debemos definir la clase del controlador que hereda de la clase base controller_interface::ControllerInterface:
+```
 namespace sine_controller {
   class SineController : public controller_interface::ControllerInterface
   {
-  
-- Among the different variables, we have to provide access to the joint state interface, to the current state of an actuator (position, velocity, effort). The ros2_control framework implements this with the LoanedStateInterface, which provides temporary, controlled access to state data for real-time operations, ensuring safe and synchronized interactions within a controller. It helps manage access to state data without causing conflicts or inconsistencies in the system:  
-  
-  
+```  
+- Entre las diferentes variables, tenemos que proporcionar acceso a la interfaz de estado de los junots, al estado actual de un actuador (posición, velocidad, esfuerzo). El marco ros2_control implementa esto con LoanedStateInterface, que proporciona acceso temporal y controlado a los datos de estado para operaciones en tiempo real, lo que garantiza interacciones seguras y sincronizadas dentro de un controlador. Ayuda a administrar el acceso a los datos de estado sin causar conflictos o inconsistencias en el sistema.
+
+```  
   private:  
     rclcpp::Duration _dt;
-
-- To use LoanedStateInterface we define a type alias for a 2D vector of std::reference_wrapper<T>. The variable
-joint_state_interfaces_ uses this type to manage references to hardware_interface::LoanedStateInterface objects:
-    
-    
+```
+- Para usar el LoanedStateInterface definimos un alias de tipo para un vector 2D de
+std::reference_wrapper<T>. 
+En esto caso, la variable _joint_state_interfaces_ usa este tipo para administrar referencias a objetos hardware_interface::LoanedStateInterface:
+```     
     template<typename T>
     using InterfaceReferences = std::vector<std::vector<std::reference_wrapper<T>>>;
     InterfaceReferences<hardware_interface::LoanedStateInterface> joint_state_interfaces_;
-    
-- Finally, a vector of string vectors is declared to define the interface name. We have to consider a new name for each joint and interface, for example: joint_name/position, joint_name/velocity, joint_name_2/position, and so on:    
-    
+```    
+- Finalmente, se declara un vector de vectores de string para definir el nombre de la interfaz. Debemos considerar un nuevo nombre para cada articulación e interfaz, por ejemplo: _joint_name/position_, _joint_name/velocity_, _joint_name_2/position_, y así sucesivamente:    
+```   
+   
     std::vector<std::vector<std::string>> state_interface_names_;
     
     int _j_size = 1;
@@ -2166,11 +2249,10 @@ joint_state_interfaces_ uses this type to manage references to hardware_interfac
 
   public:
     SineController() : controller_interface::ControllerInterface(), _dt(0, 0) {}
-
-
-- The callback uses the received data to fill the amplitude, and the frequency defined in as class members. First, we check that the format of the data is correct. We need 4 numbers to set the parameters correctly
-
-
+```
+- La callback utiliza los datos recibidos para inizializar la amplitud y la frecuencia definidas como miembros de la clase. 
+- Primero, verificamos que el formato de los datos sea correcto. Necesitamos 2 números para configurar los parámetros correctamente.
+```
 
     void sine_param_cb(const std_msgs::msg::Float32MultiArray::SharedPtr msg)  {
     
@@ -2184,109 +2266,98 @@ joint_state_interfaces_ uses this type to manage references to hardware_interfac
       
     }
 
-
-- We are now ready to define the state and the command interfaces. These functions are called automatically by the controller manager:
-  
-    
-    // setta dove andare a prendere lo stato (virtuale) - hw interface
+```
+- Ahora estamos listos para definir el estado y las interfaces de comandos. Estas funciones son llamadas automáticamente por el ros2_control framework:
+```    
     controller_interface::InterfaceConfiguration state_interface_configuration() const {
-    
-- Here we can hardcode the name of the state interfaces. The syntax is: joint_name/interface. Since in the configuration of the joints we share the position and the velocity as joint states, and we have two joints, we will add
-4 elements to the state_interfaces_config_names vector:
-    
+```    
+- Aquí hardcodamos el nombre de las interfaces de estado. La sintaxis es: joint_name/interface. Dado que en la configuración de las articulaciones compartimos la posición y la velocidad como estados de el motor, y tenemos dos articulaciones, agregaremos:
+```    
     
       std::vector<std::string> state_interfaces_config_names;
       state_interfaces_config_names.push_back("revolute_joint/position");
       //state_interfaces_config_names.push_back("revolute_joint/velocity");
-  
-  
-- To effectively set the interfaces, we have to return the interface list. In this case, we specify them using the INDIVIDUAL property, that is specify a detailed list of required interfaces, formatted as <joint_name>/<interface_type>:
-  
+```
+- Para configurar las interfaces de forma efectiva, debemos devolver la lista de interfaces. En este caso, las especificamos mediante la propiedad INDIVIDUAL. Especificamos una lista detallada de las interfaces requeridas, con el formato <joint_name>/<interface_type>:
+```
       return {
           controller_interface::interface_configuration_type::INDIVIDUAL, state_interfaces_config_names};
     }
-    
-The same thing is done with the command interfaces. Of course, in this case we just specify the position, since we want to control the position of the joints
-    
+```    
+Lo mismo ocurre con las interfaces de comandos. Por supuesto, en este caso solo especificamos la posición, ya que queremos controlar la posición de las articulaciones.
+```
     controller_interface::InterfaceConfiguration command_interface_configuration() const {
       std::vector<std::string> command_interfaces_config_names;
       command_interfaces_config_names.push_back("revolute_joint/position");
       
-      
-And, also, in this case, we turn the list of the INDIVIDUAL interfaces participating in the motor control:
-      
-      
-     
+```     
+Y, además, en este caso, devolvemos la lista de las interfaces INDIVIDUALES que participan en el control del motor:
+```      
       return {
           controller_interface::interface_configuration_type::INDIVIDUAL, command_interfaces_config_names};
     }
-
-- In the on_configure function, we can do all the operations needed before starting the controllers. Here, we initialize the subscriber of the sinusoidal parameters
-
+```
+- En la función on_configure podemos realizar todas las operaciones necesarias antes de iniciar los controladores. Aquí inicializamos el suscriptor de los parámetros sinusoidales
+```
     controller_interface::CallbackReturn on_configure(const rclcpp_lifecycle::State & /*previous_state*/)
     {
       
       _sine_param_sub =   get_node()->create_subscription<std_msgs::msg::Float32MultiArray>("/sine_param", 10, 
             std::bind(&SineController::sine_param_cb, this, std::placeholders::_1));
-
-
-As for the _dt variable, it is the step time of the update function. The update_rate_ param is used to retrieve the rate of the controller from the ROS2 parameter server. As seen, we specified the parameters in the .yaml file to configure the controllers
-
+```
+- En cuanto a la variable _dt, es lo step de la funcion de update. El parámetro update_rate_ se utiliza para recuperar la velocidad del controlador del servidor de parámetros ROS 2. Como se ve, especificamos los parámetros en el archivo .yaml para configurar los controladores.
+```
       _dt = rclcpp::Duration(std::chrono::duration<double, std::milli>(1e3 / update_rate_));
 
       _amplitude = 0.0;
       _frequency = 0.0;
-
-- Then, we resize the command to the interface vectors. 
-
+```
+- Luego redimensionamos el comando a los vectores de la interfaz.
+```
       command_interfaces_.reserve     (_j_size); 
       state_interfaces_.reserve       (_j_size);
       joint_state_interfaces_.resize  (_j_size);
       state_interface_names_.resize   (_j_size);
-      
-    
-- We also initialize a list of the interfaces, we will use it later.    
-    
+```  
+- También inicializamos una lista de las interfaces, la usaremos más adelante.
+```     
       std::vector<std::string> joint_name = {"revolute_joint"};
       for(int i = 0; i < _j_size; i++) {
         state_interface_names_[i].resize(1);
         state_interface_names_[i][0] = joint_name[i] + "/position";
       }
-
-
-- This function must return the eventual SUCCESS or FAILURE of the initialization. Imagine that in this function you need to read some parameters. If the params don't exist or are not correctly specified, you could get a FAILURE in return; though, it’s SUCCESS in our case
-  
+```
+- Esta función debe devolver el SUCCESS o FAIL de la inicialización. Imagina que en esta función necesitas leer algunos parámetros. Si los parámetros no existen o no están especificados correctamente, podrías obtener un FAIL como resultado; sin embargo, en nuestro caso es SUCCESS.
+```
       RCLCPP_INFO(get_node()->get_logger(), "configure successful");
       return controller_interface::CallbackReturn::SUCCESS;
     }
-
-- Another function to implement is the on_activate function. This function is called when the controller passes from an inactive to active state:
-
+```
+- Otra función a implementar es la función on_activate. Esta función se llama cuando el controlador pasa de un estado inactivo a uno activo:
+```
     // quando il controllore passa in attivo
     controller_interface::CallbackReturn on_activate(const rclcpp_lifecycle::State &)
     {
-    
-- We call the get_ordered_interfaces function from the controller_interface namespace that is used to retrieve and organize a
-list of interfaces, specifically state_interfaces:    
-    
+``` 
+- Llamamos a la función _get_ordered_interfaces_ desde el espacio de nombres _controller_interface_ que se utiliza para recuperar y organizar una
+lista de interfaces, específicamente _state_interfaces_:
+``` 
     
       for(int i = 0; i < 1; i++) 
         controller_interface::get_ordered_interfaces( state_interfaces_, state_interface_names_[i], std::string(""),joint_state_interfaces_[i]);
-      
-. Then, we retrieve the joint position to save the initial value of the motor control:      
-      
-      
+```    
+- Luego recuperamos la posición de el junto para guardar el valor inicial del motor     
+```         
       _initial_joint_position = joint_state_interfaces_[0][0].get().get_value();
       RCLCPP_INFO(get_node()->get_logger(), "Activate successful");
       t_ = 0.0;
 
-
-
       return controller_interface::CallbackReturn::SUCCESS;
     }
 
-- We don’t do any operation in the on_init and deactivate functions
-  
+```
+- No realizamos ninguna operación en las funciones on_init y deactivate
+ ``` 
     // on init viene chiamato quando c' il load del controllore
     controller_interface::CallbackReturn on_init() {
       return controller_interface::CallbackReturn::SUCCESS;
@@ -2295,35 +2366,34 @@ list of interfaces, specifically state_interfaces:
     controller_interface::CallbackReturn on_deactivate(const rclcpp_lifecycle::State & /*previous_state*/) {
       return controller_interface::CallbackReturn::SUCCESS;
     }
-    
-- Finally, we can write the update function. Here, we must calculate the desired values of the joints that follow the sinusoidal profile:
-    
+```    
+- Finalmente, podemos escribir la función de update. 
+  - Aquí debemos calcular los valores deseados de las articulaciones que siguen el perfil sinusoidal.
+```  
     
     controller_interface::return_type update(const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/) {
-    
-- First, we increment the local time variable that is used to proceed with the sinusoidal signal. Then, for each joint, we calculate the desired position with the classical sinusoidal formula: x(t) = Amplitude*sin(2*pi*Frequency*time)
-    
-    
+ ```
+- Primero, incrementamos la variable de tiempo local que se utiliza para procesar la señal sinusoidal. Luego, calculamos la posición deseada del joint con la fórmula sinusoidal clásica: x(t) = Amplitud*sin(2*pi*F*t)
+```  
         t_ += _dt.seconds();
         _desired_joint_positions = _initial_joint_position + (_amplitude * std::sin(2 * M_PI * _frequency * t_));
-        
-- Finally, we can set the desired position value using the command interface.        
-        
+```  
+- Finalmente, podemos establecer el valor de posición deseado mediante la interfaz de comandos.
+```   
 
         command_interfaces_[0].set_value(_desired_joint_positions);
         return controller_interface::return_type::OK;
     }
   };
 } // namespace sine_controller
-
-- We are now ready to install the plugin. At this stage, we use the PLUGINLIB_EXPORT_CLASS macro. This macro is defined into the pluginlib/class_list_macros.hpp header file. For this reason, we need to include this header file in our source code. To successfully export the controller, we must specify as first parameter the class containing the controller
-implementation, like <controller_name_namespace>::<ControllerName>, and as the second parameter the base class of the controller, that is controller_interface::ControllerInterface.
-
+```
+- Ahora estamos listos para instalar el complemento. Utilizamos la macro __PLUGINLIB_EXPORT_CLASS__. Esta macro está definida en el archivo de encabezado _pluginlib/class_list_macros.hpp_. Por este motivo, debemos incluir este archivo de encabezado en nuestro código. Para exportar correctamente el controlador, debemos especificar como primer parámetro la clase que contiene el controlador.
+```
 #include "pluginlib/class_list_macros.hpp"
 PLUGINLIB_EXPORT_CLASS(sine_controller::SineController, controller_interface::ControllerInterface)
 ```
 
-3) Add the xml file
+3) Añandir el xml file
 ```
 <library path="sine_controller">
   <class name="sine_controller/SineController" type="sine_controller::SineController" base_class_type="controller_interface::ControllerInterface">
@@ -2333,7 +2403,7 @@ PLUGINLIB_EXPORT_CLASS(sine_controller::SineController, controller_interface::Co
   </class>
 </library>
 ```
-4) Edit the _CMakeLists.txt_
+4) Editar el _CMakeLists.txt_
 ```
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -2356,14 +2426,10 @@ install(
   LIBRARY DESTINATION lib
 )
 ```
-
-
-5) Add the controller to the robot
-- Edit the dependencies (via the _CMakeListst.txt_)
+5) Añadir el controller al robot model
 ```
 find_package(sine_ctrl REQUIRED)
 ```
-- Launch the controller in the launch file
 ```
 load_sine_controller = ExecuteProcess ( 
         cmd=['ros2', 'control', 'load_controller', '--set-state', 'inactive',
@@ -2387,29 +2453,8 @@ return LaunchDescription([
         load_sine_controller
     ])
 ```
-6) Start the sineusoidal controller
+6) Empezamos el controller
 ```
 $ ros2 control switch_controllers --activate sine_controller --deactivate position_control
 $ ros2 topic pub /sine_param std_msgs/msg/Float32MultiArray "{data: [1.3, 0.3]}"
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
