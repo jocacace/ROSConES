@@ -26,7 +26,7 @@ Para adjuntar un nuevo terminal a este contenedor Docker, usa el comando _docker
 Este último comando abre el acceso al contenedor Docker en el nivel superior de la carpeta Docker. Este será tu espacio de trabajo de ROS 2 (la ros workspace). Por ejemplo, aquí puedes compilar el espacio de trabajo:
 
 		$ colcon build --symlink-install
-    $ source /opt/ros/humble/setup.bash
+		$ source /opt/ros/humble/setup.bash
 		
 Ahora puedes comenzar a compilar y ejecutar los ejemplos!
 
@@ -58,9 +58,9 @@ $ sudo wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings
 
 $ sudo echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null 
 
-$sudo apt-get update 
+$ sudo apt-get update 
 
-$sudo apt-get install ignition-fortress ros-humble-ros-ign-bridge ros-humble-ros-gz ros-humble-controller-manager ros-humble-ros2-control ros-humble-ros2-controllers 
+$ sudo apt-get install ignition-fortress ros-humble-ros-ign-bridge ros-humble-ros-gz ros-humble-controller-manager ros-humble-ros2-control ros-humble-ros2-controllers 
 ros-humble-ign-ros2-control -y
 ```
 
@@ -173,6 +173,10 @@ El modelo del robot es el siguiente. Es solo un link con la forma de un cubo.
 
 Utilizamos un launch file para añadir el robot a la simulación. Vamos a escribir esto file. 
 
+		$ cd spawn_simple_object/launch
+		$ touch spawn_model.launch.py
+
+
 - Empezamos importando los módulos relevantes
 ```
 from launch import LaunchDescription
@@ -254,9 +258,17 @@ Este paquete utiliza los paquetes _realsense2-camera_ y _realsense2-description_
     $ sudo apt-get install ros-humble-realsense2-description
     
 Vamos a crear el nuevo paquete _gazebo_sensors_.
+
     $ ros2 pkg create gazebo_sensors --dependencies xacro realsense2_description
     
 ### Define el modelo (xacro) 
+
+Editamos el nuevo modelo
+
+	$ cd gazebo_sensors
+	$ mkdir urdf
+	$ touch urdf/cube_with_sensors.urdf.xacro
+
 Aqui tenemos algún parameters para decidir que sensore activar.
 ```
 <?xml version="1.0"?>
@@ -352,7 +364,7 @@ Aqui tenemos algún parameters para decidir que sensore activar.
 ```
 - Si el paràmetro _use_depth_ camera està true, añade el depth sensor. 
 ```
-xacro:if value="${use_depth}">         
+<xacro:if value="${use_depth}">         
         <gazebo reference="base_link">
             <xacro:include filename="$(find realsense2_description)/urdf/_d435.urdf.xacro"/>
             <xacro:sensor_d435 parent="base_link" use_nominal_extrinsics="true" add_plug="false" use_mesh="true">
@@ -434,8 +446,15 @@ xacro:if value="${use_depth}">
             </plugin>   
         </gazebo>
     </xacro:if>
+</robot>
 ```
 #### Creamos el launch file
+
+	$ mkdir launch
+	$ touch launch/cube_with_sensors.launch.py
+
+
+
 ```
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
@@ -2458,3 +2477,4 @@ return LaunchDescription([
 $ ros2 control switch_controllers --activate sine_controller --deactivate position_control
 $ ros2 topic pub /sine_param std_msgs/msg/Float32MultiArray "{data: [1.3, 0.3]}"
 ```
+
