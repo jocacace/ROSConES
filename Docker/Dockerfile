@@ -5,8 +5,8 @@ FROM ubuntu:jammy
 # To check their value use these commands
 # $ id -u  (for the UID)
 # $ id -g  (for the GUI)
-ARG UID=1001
-ARG GID=1001
+ARG UID=1000
+ARG GID=1000
 
 RUN locale
 RUN apt-get update && apt-get install locales -y
