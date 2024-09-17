@@ -1,3 +1,4 @@
+
 # ROSCon_Es 2024 tutorial: Modern Gazebo y integraciòn con ros2_control
 
 Este repository contiene el código fuente para seguir el tutorial de ROSConES 2024 titulado: _Tutorial de Gazebo e integración con ros2_control_ realizado por Jonathan Cacace de la __Unidad de Robótica de Eurecat__  
@@ -628,7 +629,7 @@ def generate_launch_description():
         executable='parameter_bridge',
         arguments=[                
                 # Lidar (IGN -> ROS2)
-                '/lidar@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan',                                
+                '/cube/scan@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan',
                 # Camera (IGN -> ROS2)
                 '/cube_camera/image_raw@sensor_msgs/msg/Image[ignition.msgs.Image',
                 '/cube_camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
@@ -656,7 +657,7 @@ def generate_launch_description():
                     executable='static_transform_publisher',
                     name='cam3Tolink',
                     output='log',
-                    arguments=['0.0', '0.0', '0.0', '0.0', '0.0', '0.0', 'sensor_link', 'lidar_link'])
+                    arguments=['0.0', '0.0', '0.0', '0.0', '0.0', '0.0', 'sensor_link', 'base_scan'])
 
     return LaunchDescription([
         bridge,
@@ -664,7 +665,15 @@ def generate_launch_description():
         lidar2sensor_link
     ])
 ```
-3) Ahora podemos usar rqt para visualizar los datos. En el docker ya esta todo instalado. Sin embargo, tu puede instalar todo los que necesita con este comandos
+3) Vamos a lanzar la simulacion
+
+		$ colcon build --symlink-install
+		$ source install/setup.bash
+		$ ros2 launch gazebo_sensors cube_with_sensors.launch.py
+		$ ros2 launch gazebo_sensors gazebo_bridge.launch.py
+
+
+4) Ahora podemos usar rqt para visualizar los datos. En el docker ya esta todo instalado. Sin embargo, tu puede instalar todo los que necesita con este comandos
 - rqt: 
 
         $ sudo apt-get install ros-humble-rqt-*
@@ -687,6 +696,11 @@ Comencemos a implementar nuestro primer robot móvil. Esto también permitirá e
 1) Crea dos archivos: uno para contener los macros y uno por el xacro principal
 
 - Vamos a definir los macros para crear el modelo del robot, la inercia del cilindro y otros.
+
+		$ touch diff_drive_description/diff_drive.urdf.xacro
+		$ touch diff_drive_description/diff_drive_macro.xacro
+
+- Editamo el diff_drive_macro.xacro
 ```
 <?xml version="1.0"?>
 <robot name="diff_robot" xmlns:xacro="http://www.ros.org/wiki/xacro">
@@ -940,6 +954,9 @@ Comencemos a implementar nuestro primer robot móvil. Esto también permitirá e
 </robot>
 ```
 2) Vamos a crear un launch file
+
+		$  touch launch/diff_drive.launch.py
+
 - Importamos los modules
 ```
 from launch import LaunchDescription
@@ -1032,7 +1049,7 @@ install(DIRECTORY launch urdf DESTINATION share/${PROJECT_NAME})
         
 ## Example 6: 
 ## Gazebo plugin
-En este ejemplo vamos a desarrollar plugins personalizados para Gazebo. Desarrollar un plugin que se añadirà a la configuración del mundo de Gazebo o directamente al modelo del robot (como se hizo con el differential drive plugin).
+En este ejemplo vamos a desarrollar plugins personalizados para Gazebo. En principio, vamos a desarrollar un plugin que se añadirà a la configuración del mundo de Gazebo o directamente al modelo del robot (como se hizo con el differential drive plugin).
 
 Un gazebo plugin permitirá de acceder directamente al modelo simulado y crear algoritmos de control más rápidos y performante. 
 Vamos a veer 3 ejemplos. 
@@ -1046,7 +1063,7 @@ Este no es un paquete ROS, entonces, tenemos que crear manualmente la estructura
 1) Creemos el plugin _hello_world_ en el ROS workspace. 
 
  
-        $ mkdir hello_world
+        $ mkdir hello_world && cd hello_world
         $ touch HelloWorld.cpp
         $ touch CMakeLists.txt
         $ touch hello_world_plugin.sdf
@@ -1175,7 +1192,7 @@ Modifiquemos ligeramente el último ejemplo para publicar el estado de la simula
 
 1) Vamos a crear un nuevo paquete 
 ``` 
-$ ros2 pkg create hello_world_ros rclcpp std_msgs 
+$ ros2 pkg create hello_world_ros --dependencies rclcpp std_msgs 
 ``` 
 
 ``` 
@@ -1185,6 +1202,7 @@ $ mkdir world
 $ touch launch/hello_world_ros.launch.py
 $ touch world/hello_world_ros_plugin.sdf
 $ touch src/hello_world_ros.cpp
+
 ``` 
 
 3) Vamos a rellenar el código, este será muy similar al primero ejemplo. Vamos a resaltar la diferencia entre los dos.
@@ -1397,11 +1415,11 @@ __Note__: Agregaremos esto plugin al model del robot en el urdf
 
 1) Vamos a crear el paquete
 ``` 
-$ ros2 pkg create cmd_vel_plugin rclcpp std_msgs geometry_msgs 
+$ ros2 pkg create cmd_vel_plugin --dependencies rclcpp std_msgs geometry_msgs 
 ``` 
 ``` 
 $ cp -r diff_drive_description/urdf/ cmd_vel_plugin/
-$ mkdir launch
+$ cd cmd_vel_plugin && mkdir launch && touch launch/cmd_vel_plugin.launch.py
 $ touch src/pub_vel_cmd.cpp
 ``` 
 3) Vamos a editar el codigo
@@ -1437,7 +1455,6 @@ namespace cmd_vel_plugin {
 ``` 
 ```
     private: rclcpp::Node::SharedPtr _ros_node; 
-    private: rclcpp::Publisher<std_msgs::msg::String>::SharedPtr _publisher;
 ``` 
 ```
 
@@ -1514,7 +1531,7 @@ set(IGN_GAZEBO_VER ${ignition-gazebo6_VERSION_MAJOR})
 ``` 
   - aqui llamamos el plugin CmdVelPlugin
 ``` 
-add_library(CmdVelPlugin SHARED src/pub_cmd_vel.cpp)
+add_library(CmdVelPlugin SHARED src/pub_vel_cmd.cpp)
 
 target_link_libraries(CmdVelPlugin 
   ignition-plugin${IGN_PLUGIN_VER}::ignition-plugin${IGN_PLUGIN_VER}
@@ -1561,6 +1578,8 @@ ament_package()
     </gazebo>
 ``` 
 6) Vamos a crear el launch file
+
+
 ``` 
 import os
 from launch import LaunchDescription
@@ -1685,6 +1704,7 @@ $ mkdir urdf
 $ mkdir launch
 $ touch urdf/pendulum_robot.xacro
 $ touch urdf/pendulum_no_controllers.launch.py
+$ touch launch/pendulum_no_controllers.launch.py
 ```
 2) Vamos a editar el modelo del robot: _pendulum_robot.xacro_
 
@@ -1991,7 +2011,7 @@ Para agregar las controladoras sigue estos pasos.
 </robot>
 ```
 - Agreguamos el ros2_control tag 
-. 
+
 ```
 <ros2_control name="IgnitionSystem" type="system">
 ```
@@ -2187,7 +2207,7 @@ $ ros2 topic list
 ```
 - Controlamos los motore
 ```
-$ ros2 topic pub /posion_control/commands std_msgs/msg/Float64MultiArray "{data: [3]}"
+$ ros2 topic pub /position_control/commands std_msgs/msg/Float64MultiArray "{data: [3]}"
 ```
 
 7) Interactuar con el controller manager
@@ -2205,7 +2225,7 @@ $ ros2 control list_hardware_interfaces
 ```
 $ ros2 control switch_controllers --activate velocity_control --deactivate position_control
 $ ros2 control list_controllers
-$ ros2 topic pub /veloty_control/commands std_msgs/msg/Float64MultiArray "{data: [2]}"
+$ ros2 topic pub /velocity_control/commands std_msgs/msg/Float64MultiArray "{data: [2]}"
 ```
 
 ### Develop a custom controller
@@ -2220,7 +2240,7 @@ A veces resulta útil crear un controlador personalizado para realizar acciones 
 $ ros2 pkg create sine_ctrl --dependencies rclcpp std_msgs controller_interface pluginlib
 $ cd sine_ctrl
 $ touch sine_controller.xml
-$ src/sine_ctrl.cpp
+$ touch src/sine_ctrl.cpp
 ```
 
 2) Creamos la fuente del controlador
@@ -2446,8 +2466,23 @@ install(
 )
 ```
 5) Añadir el controller al robot model
+- Incluimos la dependencia
 ```
 find_package(sine_ctrl REQUIRED)
+```
+- Modificamos el controller yaml
+```
+    sine_controller:
+      type: sine_controller/SineController
+	
+	sine_controller:
+	  ros__parameters:
+	    update_rate: 100
+	    joints:
+	      - revolute_joint
+	    state_interfaces:
+	      - position
+	      - velocity
 ```
 ```
 load_sine_controller = ExecuteProcess ( 
