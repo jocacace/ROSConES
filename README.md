@@ -580,11 +580,11 @@ El tipo de mensaje ROS va seguido de un símbolo @, [ o ] donde:
 
 - Inicia el bridge
     
-        $ ros2 run ros_gz_bridge parameter_bridge /keyboard/keyprs@std_msgs/msg/Int32[ignition.msgs.Int32
+        $ ros2 run ros_gz_bridge parameter_bridge /keyboard/keypress@std_msgs/msg/Int32[ignition.msgs.Int32
 
 - Escucha el messaje en ROS
 
-        $ ros2 topic echo /keyboard/keyprs
+        $ ros2 topic echo /keyboard/keypress
         
 #### Bridge the Sensor data
 Vamos a crear un launch file que inicializa los tres bridges para los tre sesores.
@@ -697,8 +697,8 @@ Comencemos a implementar nuestro primer robot móvil. Esto también permitirá e
 
 - Vamos a definir los macros para crear el modelo del robot, la inercia del cilindro y otros.
 
-		$ touch diff_drive_description/diff_drive.urdf.xacro
-		$ touch diff_drive_description/diff_drive_macro.xacro
+		$ touch diff_drive_description/urdf/diff_drive.urdf.xacro
+		$ touch diff_drive_description/urdf/diff_drive_macro.xacro
 
 - Editamo el diff_drive_macro.xacro
 ```
@@ -796,14 +796,14 @@ Comencemos a implementar nuestro primer robot móvil. Esto también permitirá e
   </xacro:macro>
 </robot>
 ```
--- Ahora podemos crear el archivo _xacro_. Primero incluya el archivo de macro
+- Ahora podemos crear el archivo _xacro_. Primero incluya el archivo de macro
 ```
 <?xml version="1.0"?>
 
 <robot name="diff_robot" xmlns:xacro="http://ros.org/wiki/xacro">
 <xacro:include filename="$(find diff_drive_description)/urdf/diff_drive_macro.xacro" /> 
 ```
--- Definimos alcun parametros
+- Definimos alcun parametros
 ```
     <xacro:property name="base_radius" value="0.15" /> 
     <xacro:property name="passive_wheel_height" value="0.04" /> 
@@ -813,7 +813,7 @@ Comencemos a implementar nuestro primer robot móvil. Esto también permitirá e
     <xacro:property name="wheel_height" value="0.02" />
     <xacro:property name="wheel_mass" value="2.5" /> 
 ```
---Y la structura del robot
+- Y la structura del robot
 ```
 	<link name="base_link">
 		<inertial>
@@ -1703,8 +1703,8 @@ $ cd pendulum_description
 $ mkdir urdf
 $ mkdir launch
 $ touch urdf/pendulum_robot.xacro
-$ touch urdf/pendulum_no_controllers.launch.py
 $ touch launch/pendulum_no_controllers.launch.py
+$ touch launch/pendulum_controller.launch.py
 ```
 2) Vamos a editar el modelo del robot: _pendulum_robot.xacro_
 
